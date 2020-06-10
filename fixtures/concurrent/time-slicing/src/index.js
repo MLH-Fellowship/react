@@ -1,5 +1,5 @@
 import React, {PureComponent} from 'react';
-import {flushSync, createRoot} from 'react-dom';
+import {flushSync, unstable_createRoot as createRoot} from 'react-dom';
 import Scheduler from 'scheduler';
 import _ from 'lodash';
 import Charts from './Charts';
