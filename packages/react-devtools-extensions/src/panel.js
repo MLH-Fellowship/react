@@ -1,3 +1,4 @@
+import {handleHookNames} from './injectGlobalHook'
 // Portal target container.
 window.container = document.getElementById('container');
 
@@ -17,3 +18,5 @@ window.injectStyles = getLinkTags => {
     }
   }
 };
+
+window.handleHookNames = (hooks) => handleHookNames(hooks)
