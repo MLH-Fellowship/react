@@ -67,6 +67,13 @@ window.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeWeakMap = WeakMap;
 window.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeSet = Set;
 `;
 
+const handleHookNames = (hooks) => {
+  console.log(hooks)
+}
+
+const injectHookNames = `
+window.__REACT_DEVTOOLS_GLOBAL_HOOK__.handleHookNames = ${handleHookNames.toString()}
+`
 // If we have just reloaded to profile, we need to inject the renderer interface before the app loads.
 if (sessionStorageGetItem(SESSION_STORAGE_RELOAD_AND_PROFILE_KEY) === 'true') {
   const rendererURL = chrome.runtime.getURL('build/renderer.js');
@@ -94,7 +101,8 @@ if ('text/html' === document.contentType) {
       installHook.toString() +
       '(window))' +
       saveNativeValues +
-      detectReact,
+      detectReact +
+      injectHookNames
   );
 }
 
