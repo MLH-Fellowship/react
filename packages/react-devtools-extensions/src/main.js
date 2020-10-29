@@ -371,7 +371,25 @@ function checkPageForReact() {
   createPanelIfReactLoaded();
 }
 
+function loadBuildAndMapFiles(response) {
+  const staticJSFiles = response.filter((element) => element.url.includes('static/js'))
+  const staticMapFiles = Promise.all(staticJSFiles.map((file) => {
+    const url = `${file.url}.map`
+    return fetch(url)
+  }))
+  staticMapFiles.then((resolvedStaticMapFiles) => {
+    resolvedStaticMapFiles.map((file) => {
+      file.json().then((jsonContents) => {
+        console.log(file.url, jsonContents)
+      })
+    })
+  })
+}
+
 chrome.devtools.network.onNavigated.addListener(checkPageForReact);
+
+// Load build files and sourcemap
+chrome.devtools.inspectedWindow.getResources(loadBuildAndMapFiles);
 
 // Check to see if React has loaded once per second in case React is added
 // after page load
