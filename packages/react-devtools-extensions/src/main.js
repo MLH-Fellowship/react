@@ -334,6 +334,7 @@ function createPanelIfReactLoaded() {
           extensionPanel.onHidden.addListener(panel => {
             // TODO: Stop highlighting and stuff.
           });
+          bridge.send('injectHookVariableNames', {shouldInject: true, sourceMap: 'some-sourcemap'});
         },
       );
 
