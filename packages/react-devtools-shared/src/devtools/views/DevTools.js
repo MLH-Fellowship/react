@@ -49,6 +49,10 @@ export type ViewAttributeSource = (
 export type CanViewElementSource = (
   inspectedElement: InspectedElement,
 ) => boolean;
+export type InjectHookVariableNames = (
+  shouldInject: boolean,
+  sourceMap?: string,
+) => void;
 
 export type Props = {|
   bridge: FrontendBridge,
@@ -62,6 +66,7 @@ export type Props = {|
   warnIfUnsupportedVersionDetected?: boolean,
   viewAttributeSourceFunction?: ?ViewAttributeSource,
   viewElementSourceFunction?: ?ViewElementSource,
+  injectHookVariableNamesFunction? : ?InjectHookVariableNames,
 
   // This property is used only by the web extension target.
   // The built-in tab UI is hidden in that case, in favor of the browser's own panel tabs.
@@ -106,6 +111,7 @@ export default function DevTools({
   warnIfUnsupportedVersionDetected = false,
   viewAttributeSourceFunction,
   viewElementSourceFunction,
+  injectHookVariableNamesFunction,
 }: Props) {
   const [currentTab, setTab] = useLocalStorage<TabID>(
     'React::DevTools::defaultTab',

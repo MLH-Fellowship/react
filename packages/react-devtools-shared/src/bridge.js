@@ -20,6 +20,11 @@ import type {StyleAndLayout as StyleAndLayoutPayload} from 'react-devtools-share
 
 const BATCH_DURATION = 100;
 
+type InjectHookVariableParams = {|
+  shouldInject: boolean,
+  sourceMap?: string,
+|};
+
 type ElementAndRendererID = {|id: number, rendererID: RendererID|};
 
 type Message = {|
@@ -167,6 +172,7 @@ type FrontendEvents = {|
   updateConsolePatchSettings: [UpdateConsolePatchSettingsParams],
   viewAttributeSource: [ViewAttributeSourceParams],
   viewElementSource: [ElementAndRendererID],
+  injectHookVariableNames: [InjectHookVariableParams],
 
   // React Native style editor plug-in.
   NativeStyleEditor_measure: [ElementAndRendererID],

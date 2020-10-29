@@ -202,6 +202,17 @@ function createPanelIfReactLoaded() {
           }
         };
 
+        const injectHookVariableNamesFunction = shouldInject => {
+          if (shouldInject) {
+            const sourceMap = '';
+            bridge.send('injectHookVariableNames', {shouldInject, sourceMap})
+
+            setTimeout(() => {
+              console.log('Loaded source maps.');
+            }, 100);
+          }
+        };
+
         root = createRoot(document.createElement('div'));
 
         render = (overrideTab = mostRecentOverrideTab) => {
@@ -220,6 +231,7 @@ function createPanelIfReactLoaded() {
               warnIfUnsupportedVersionDetected: true,
               viewAttributeSourceFunction,
               viewElementSourceFunction,
+              injectHookVariableNamesFunction,
             }),
           );
         };

@@ -50,6 +50,11 @@ const debug = (methodName, ...args) => {
   }
 };
 
+type InjectHookVariableParams = {|
+  shouldInject: boolean,
+  sourceMap?: string,
+|};
+
 type ElementAndRendererID = {|
   id: number,
   rendererID: number,
@@ -196,6 +201,7 @@ export default class Agent extends EventEmitter<{|
     bridge.addListener('updateComponentFilters', this.updateComponentFilters);
     bridge.addListener('viewAttributeSource', this.viewAttributeSource);
     bridge.addListener('viewElementSource', this.viewElementSource);
+    bridge.addListener('injectHookVariableNames', this.injectHookVariableNames);
 
     // Temporarily support older standalone front-ends sending commands to newer embedded backends.
     // We do this because React Native embeds the React DevTools backend,
@@ -610,6 +616,14 @@ export default class Agent extends EventEmitter<{|
       console.warn(`Invalid renderer id "${rendererID}" for element "${id}"`);
     } else {
       renderer.prepareViewElementSource(id);
+    }
+  };
+
+  injectHookVariableNames = ({shouldInject, sourceMap}: InjectHookVariableParams) => {
+    if (!shouldInject) {
+      debug(`Hooks not found.`);
+    } else {
+      debug(JSON.stringify(sourceMap));
     }
   };
 
