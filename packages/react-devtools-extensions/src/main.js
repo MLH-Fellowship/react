@@ -202,6 +202,12 @@ function createPanelIfReactLoaded() {
           }
         };
 
+        function injectHookVariableNamesFunction(hookLog, source) {
+          console.log('----main.js----')
+          console.log('injectHookVariableNamesFunction called with', hookLog, source)
+          return hookLog.map((log) => ({...log, name: 'State-alter'})) 
+        }
+
         root = createRoot(document.createElement('div'));
 
         render = (overrideTab = mostRecentOverrideTab) => {
@@ -220,6 +226,7 @@ function createPanelIfReactLoaded() {
               warnIfUnsupportedVersionDetected: true,
               viewAttributeSourceFunction,
               viewElementSourceFunction,
+              injectHookVariableNamesFunction
             }),
           );
         };
