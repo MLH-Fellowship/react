@@ -202,6 +202,19 @@ function createPanelIfReactLoaded() {
           }
         };
 
+        function injectHookVariableNamesFunction(hookLog) {
+          const newHookLog = new Promise((resolve, reject) => {
+            setTimeout(() => {
+              const newHook = hookLog.map((hook) => {
+                return {...hook, 'variableName':'parsed-variable-name'}
+              })
+              resolve(newHook)
+            }, 8000)
+          })
+          console.log('injectHookVariableNamesFunction called with', newHookLog, hookLog)
+          return newHookLog
+        }
+
         root = createRoot(document.createElement('div'));
 
         render = (overrideTab = mostRecentOverrideTab) => {
@@ -220,6 +233,7 @@ function createPanelIfReactLoaded() {
               warnIfUnsupportedVersionDetected: true,
               viewAttributeSourceFunction,
               viewElementSourceFunction,
+              injectHookVariableNamesFunction
             }),
           );
         };

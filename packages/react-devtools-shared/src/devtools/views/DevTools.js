@@ -22,6 +22,7 @@ import TabBar from './TabBar';
 import {SettingsContextController} from './Settings/SettingsContext';
 import {TreeContextController} from './Components/TreeContext';
 import ViewElementSourceContext from './Components/ViewElementSourceContext';
+import InjectHookVariableNamesFunctionContext from './Components/InjectHookVariableNamesFunctionContext';
 import {ProfilerContextController} from './Profiler/ProfilerContext';
 import {ModalDialogContextController} from './ModalDialog';
 import ReactLogo from './ReactLogo';
@@ -35,13 +36,24 @@ import './root.css';
 
 import type {InspectedElement} from 'react-devtools-shared/src/devtools/views/Components/types';
 import type {FrontendBridge} from 'react-devtools-shared/src/bridge';
+import type {Source} from '../../../../shared/ReactElementType'
 
 export type BrowserTheme = 'dark' | 'light';
 export type TabID = 'components' | 'profiler';
+type HookLogEntry = {
+  primitive: string,
+  stackError: Error,
+  value: mixed,
+  ...
+};
+
+type HookLog = Array<HookLogEntry> | null
+
 export type ViewElementSource = (
   id: number,
   inspectedElement: InspectedElement,
 ) => void;
+export type InjectHookVariableNamesFunction = (hookLog: HookLog) => Promise<HookLog>;
 export type ViewAttributeSource = (
   id: number,
   path: Array<string | number>,
@@ -62,6 +74,8 @@ export type Props = {|
   warnIfUnsupportedVersionDetected?: boolean,
   viewAttributeSourceFunction?: ?ViewAttributeSource,
   viewElementSourceFunction?: ?ViewElementSource,
+  // Passing HookVariableNamesFunction as a Prop
+  injectHookVariableNamesFunction?: ?InjectHookVariableNamesFunction,
 
   // This property is used only by the web extension target.
   // The built-in tab UI is hidden in that case, in favor of the browser's own panel tabs.
@@ -106,6 +120,7 @@ export default function DevTools({
   warnIfUnsupportedVersionDetected = false,
   viewAttributeSourceFunction,
   viewElementSourceFunction,
+  injectHookVariableNamesFunction
 }: Props) {
   const [currentTab, setTab] = useLocalStorage<TabID>(
     'React::DevTools::defaultTab',
@@ -117,6 +132,13 @@ export default function DevTools({
   if (overrideTab != null) {
     tab = overrideTab;
   }
+
+  const injectHookVariableNames = useMemo(
+    () => ({
+      injectHookVariableNamesFunction: injectHookVariableNamesFunction || null
+    }),
+    [injectHookVariableNamesFunction]
+  )
 
   const viewElementSource = useMemo(
     () => ({
@@ -179,7 +201,6 @@ export default function DevTools({
       }
     };
   }, [bridge]);
-
   return (
     <BridgeContext.Provider value={bridge}>
       <StoreContext.Provider value={store}>
@@ -190,40 +211,42 @@ export default function DevTools({
               componentsPortalContainer={componentsPortalContainer}
               profilerPortalContainer={profilerPortalContainer}>
               <ViewElementSourceContext.Provider value={viewElementSource}>
-                <TreeContextController>
-                  <ProfilerContextController>
-                    <div className={styles.DevTools} ref={devToolsRef}>
-                      {showTabBar && (
-                        <div className={styles.TabBar}>
-                          <ReactLogo />
-                          <span className={styles.DevToolsVersion}>
-                            {process.env.DEVTOOLS_VERSION}
-                          </span>
-                          <div className={styles.Spacer} />
-                          <TabBar
-                            currentTab={tab}
-                            id="DevTools"
-                            selectTab={setTab}
-                            tabs={tabs}
-                            type="navigation"
+                <InjectHookVariableNamesFunctionContext.Provider value={injectHookVariableNames}>
+                  <TreeContextController>
+                    <ProfilerContextController>
+                      <div className={styles.DevTools} ref={devToolsRef}>
+                        {showTabBar && (
+                          <div className={styles.TabBar}>
+                            <ReactLogo />
+                            <span className={styles.DevToolsVersion}>
+                              {process.env.DEVTOOLS_VERSION}
+                            </span>
+                            <div className={styles.Spacer} />
+                            <TabBar
+                              currentTab={tab}
+                              id="DevTools"
+                              selectTab={setTab}
+                              tabs={tabs}
+                              type="navigation"
+                            />
+                          </div>
+                        )}
+                        <div
+                          className={styles.TabContent}
+                          hidden={tab !== 'components'}>
+                          <Components
+                            portalContainer={componentsPortalContainer}
                           />
                         </div>
-                      )}
-                      <div
-                        className={styles.TabContent}
-                        hidden={tab !== 'components'}>
-                        <Components
-                          portalContainer={componentsPortalContainer}
-                        />
+                        <div
+                          className={styles.TabContent}
+                          hidden={tab !== 'profiler'}>
+                          <Profiler portalContainer={profilerPortalContainer} />
+                        </div>
                       </div>
-                      <div
-                        className={styles.TabContent}
-                        hidden={tab !== 'profiler'}>
-                        <Profiler portalContainer={profilerPortalContainer} />
-                      </div>
-                    </div>
-                  </ProfilerContextController>
-                </TreeContextController>
+                    </ProfilerContextController>
+                  </TreeContextController>
+                </InjectHookVariableNamesFunctionContext.Provider>
               </ViewElementSourceContext.Provider>
             </SettingsContextController>
             {warnIfLegacyBackendDetected && <WarnIfLegacyBackendDetected />}

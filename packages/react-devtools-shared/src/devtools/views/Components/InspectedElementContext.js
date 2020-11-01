@@ -22,6 +22,7 @@ import {createResource} from '../../cache';
 import {BridgeContext, StoreContext} from '../context';
 import {hydrate, fillInPath} from 'react-devtools-shared/src/hydration';
 import {TreeStateContext} from './TreeContext';
+import InjectHookVariableNamesFunctionContext from './InjectHookVariableNamesFunctionContext';
 import {separateDisplayNameAndHOCs} from 'react-devtools-shared/src/utils';
 
 import type {
@@ -101,7 +102,7 @@ type Props = {|
 function InspectedElementContextController({children}: Props) {
   const bridge = useContext(BridgeContext);
   const store = useContext(StoreContext);
-
+  const injectHookVariableNamesFunction = useContext(InjectHookVariableNamesFunctionContext).injectHookVariableNamesFunction
   const storeAsGlobalCount = useRef(1);
 
   // Ask the backend to store the value at the specified path as a global variable.
@@ -258,6 +259,15 @@ function InspectedElementContextController({children}: Props) {
             props: hydrateHelper(props),
             state: hydrateHelper(state),
           };
+
+          // If injectHookVariableNamesFunction prop present, wait on new hook (with variable names) to resolve
+          // and replace old hooks structure with the new one
+          if (injectHookVariableNamesFunction) {
+            const namedHooksPromise = injectHookVariableNamesFunction(hydrateHelper(hooks))
+            namedHooksPromise.then(namedHooks => {
+              inspectedElement.hooks = namedHooks
+            })
+          }
 
           element = store.getElementByID(id);
           if (element !== null) {
