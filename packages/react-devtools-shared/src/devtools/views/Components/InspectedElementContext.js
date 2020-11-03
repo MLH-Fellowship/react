@@ -255,10 +255,19 @@ function InspectedElementContextController({children}: Props) {
                     };
                   }),
             context: hydrateHelper(context),
-            hooks: injectHookVariableNamesFunction ? injectHookVariableNamesFunction(hydrateHelper(hooks)) :hydrateHelper(hooks),
+            hooks: hydrateHelper(hooks),
             props: hydrateHelper(props),
             state: hydrateHelper(state),
           };
+
+          // If injectHookVariableNamesFunction prop present, wait on new hook (with variable names) to resolve
+          // and replace old hooks structure with the new one
+          if (injectHookVariableNamesFunction) {
+            const namedHooksPromise = injectHookVariableNamesFunction(hydrateHelper(hooks), source)
+            namedHooksPromise.then(namedHooks => {
+              inspectedElement.hooks = namedHooks
+            })
+          }
 
           element = store.getElementByID(id);
           if (element !== null) {
