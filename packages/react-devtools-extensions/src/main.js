@@ -202,10 +202,9 @@ function createPanelIfReactLoaded() {
           }
         };
 
-        function injectHookVariableNamesFunction(hookLog, source) {
-          console.log('----main.js----')
-          console.log('injectHookVariableNamesFunction called with', hookLog, source)
-          return hookLog.map((log) => ({...log, name: 'State-alter'})) 
+        function injectHookVariableNamesFunction(hookLog) {
+          console.log('injectHookVariableNamesFunction called with', hookLog)
+          return hookLog
         }
 
         root = createRoot(document.createElement('div'));

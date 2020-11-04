@@ -255,7 +255,7 @@ function InspectedElementContextController({children}: Props) {
                     };
                   }),
             context: hydrateHelper(context),
-            hooks: injectHookVariableNamesFunction ? injectHookVariableNamesFunction(hydrateHelper(hooks), source) :hydrateHelper(hooks),
+            hooks: injectHookVariableNamesFunction ? injectHookVariableNamesFunction(hydrateHelper(hooks)) :hydrateHelper(hooks),
             props: hydrateHelper(props),
             state: hydrateHelper(state),
           };
