@@ -317,17 +317,19 @@ const Dispatcher: DispatcherType = {
 
 // Inspect
 
+type HookSource = {
+  lineNumber: number | null,
+  columnNumber: number | null,
+  fileName: string | null,
+  functionName: string | null,
+}
 export type HooksNode = {
   id: number | null,
   isStateEditable: boolean,
   name: string,
   value: mixed,
   subHooks: Array<HooksNode>,
-  hookSource: {
-    lineNumber: number | null,
-    fileName: string | null,
-    functionName: string | null,
-  },
+  hookSource: HookSource,
   ...
 };
 export type HooksTree = Array<HooksNode>;
@@ -506,6 +508,7 @@ function buildTree(rootStack, readHookLog): HooksTree {
           subHooks: children,
           hookSource: {
             lineNumber: stack[j-1].lineNumber,
+            columnNumber: stack[j-1].columnNumber,
             functionName: stack[j-1].functionName,
             fileName: stack[j-1].fileName
           }
@@ -526,12 +529,13 @@ function buildTree(rootStack, readHookLog): HooksTree {
 
     // For the time being, only State and Reducer hooks support runtime overrides.
     const isStateEditable = primitive === 'Reducer' || primitive === 'State';
-    const hookSource = {lineNumber: null, functionName: null, fileName: null}
+    const hookSource: HookSource = {lineNumber: null, functionName: null, fileName: null, columnNumber: null}
     if (stack && stack.length === 1) {
       const stackFrame = stack[0]
       hookSource.lineNumber = stackFrame.lineNumber
       hookSource.functionName = stackFrame.functionName
       hookSource.fileName = stackFrame.fileName
+      hookSource.columnNumber = stackFrame.columnNumber
     }
 
     levelChildren.push({
