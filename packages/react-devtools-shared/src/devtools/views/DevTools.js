@@ -53,7 +53,7 @@ export type ViewElementSource = (
   id: number,
   inspectedElement: InspectedElement,
 ) => void;
-export type InjectHookVariableNamesFunction = (hookLog: HookLog) => HookLog;
+export type InjectHookVariableNamesFunction = (hookLog: HookLog) => Promise<HookLog>;
 export type ViewAttributeSource = (
   id: number,
   path: Array<string | number>,

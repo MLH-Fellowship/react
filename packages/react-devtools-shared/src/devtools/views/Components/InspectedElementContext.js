@@ -263,7 +263,7 @@ function InspectedElementContextController({children}: Props) {
           // If injectHookVariableNamesFunction prop present, wait on new hook (with variable names) to resolve
           // and replace old hooks structure with the new one
           if (injectHookVariableNamesFunction) {
-            const namedHooksPromise = injectHookVariableNamesFunction(hydrateHelper(hooks), source)
+            const namedHooksPromise = injectHookVariableNamesFunction(hydrateHelper(hooks))
             namedHooksPromise.then(namedHooks => {
               inspectedElement.hooks = namedHooks
             })
