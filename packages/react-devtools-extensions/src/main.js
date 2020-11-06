@@ -4,7 +4,8 @@ import {createElement} from 'react';
 import {unstable_createRoot as createRoot, flushSync} from 'react-dom';
 import Bridge from 'react-devtools-shared/src/bridge';
 import Store from 'react-devtools-shared/src/devtools/store';
-import {getBrowserName, getBrowserTheme} from './utils';
+import { SourceMapConsumer } from 'source-map';
+import {getBrowserName, getBrowserTheme, fetchFileFromURL, isValidUrl, extractLinefromSourceFile, parseLine} from './utils';
 import {LOCAL_STORAGE_TRACE_UPDATES_ENABLED_KEY} from 'react-devtools-shared/src/constants';
 import {
   getAppendComponentStack,
@@ -202,17 +203,63 @@ function createPanelIfReactLoaded() {
           }
         };
 
-        function injectHookVariableNamesFunction(id, hookLog) {
-          // TODO Load source and source map, parse AST, mix in real names.
-          const namedHookLogPromise = new Promise((resolve, reject) => {
-            setTimeout(() => {
-              const newHookLog = hookLog.map(hook => {
-                return {...hook, name: 'hook-variable-name'};
-              });
-              resolve(newHookLog);
-            }, 2000);
-          });
-          return namedHookLogPromise;
+        function injectHookVariableNamesFunction(hookLog) {
+          console.log('injectHookVariableNamesFunction called with', hookLog)
+          hookLog.map((hook) => {
+            console.log(hook)
+            const {fileName, lineNumber, columnNumber} = hook.hookSource
+            fetchFileFromURL(fileName)
+              .then((fileData) => {
+                /**
+                * TODO: Use a regex to obtain the sourceMappingURL
+                * const sourceMappingURLRegex = '/~//[#@]\s(source(?:Mapping)?URL)=\s*(\S+)~/g'
+                */
+                const sourceMapPartialURL = fileData.split('sourceMappingURL=')[1];
+                if (!isValidUrl(fileName)) {
+                  return;
+                }
+                const lastIndexOfBackslash = fileName.lastIndexOf('/');
+                const sourceMapURL = fileName.substr(0,lastIndexOfBackslash+1) + sourceMapPartialURL;
+                fetchFileFromURL((sourceMapURL)).then((sourceMap) => {
+                  /**
+                   * Utilise sourcemap to pinpoint filename and coordinates of hook
+                   * in the source code.
+                   */
+                  const sourceMapJSON = JSON.parse(sourceMap);
+                  const WasmMappingsURL = 'https://unpkg.com/source-map@0.7.3/lib/mappings.wasm'
+                  SourceMapConsumer.initialize({ 'lib/mappings.wasm': WasmMappingsURL });
+                  Promise.resolve(SourceMapConsumer.with(sourceMapJSON, null, consumer => {
+                    const {source, line, column} = consumer.originalPositionFor({
+                        line: lineNumber,
+                        column: columnNumber
+                    })
+                    /**
+                     * Approach 1:
+                     * Obtain source file contents as string (using the API) and split on newline characters.
+                     * Since the resultant array represents line by line contents of the file, we can simply
+                     * use the line number to index the desired line of code and parse it to truncate
+                     * white space pending. Using a custom regex will fetch us the variable name.
+                     */
+                    const newLineRegex = /\r?\n/;
+                    const sourceFileContentsArray = (consumer.sourceContentFor(source, true)).split(newLineRegex);
+                    const parsedTargetLine = parseLine(sourceFileContentsArray[line-1]);
+                    console.log(parsedTargetLine);
+                    
+                    /** 
+                     * Approach 2:
+                     * Creating a read stream from the file path and reading it line by line.
+                     * Doesn't work with fs and readline, possibly because browser doesn't support these.
+                     * FileReader API might be a possible workaround, but MDN says that it can only read
+                     * from a local filesystem, and not fron just any filesystem (provided file path)
+                    */
+                    // const targetLine = Promise.resolve(extractLinefromSourceFile(line, source))
+                    // console.log(targetLine)
+                  }))
+                })
+
+              })
+          })
+          return hookLog
         }
 
         root = createRoot(document.createElement('div'));
