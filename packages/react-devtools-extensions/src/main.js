@@ -4,7 +4,10 @@ import {createElement} from 'react';
 import {unstable_createRoot as createRoot, flushSync} from 'react-dom';
 import Bridge from 'react-devtools-shared/src/bridge';
 import Store from 'react-devtools-shared/src/devtools/store';
-import {getBrowserName, getBrowserTheme} from './utils';
+import { SourceMapConsumer } from 'source-map';
+import {getBrowserName, getBrowserTheme, fetchFileFromURL, getSourceMapURL, presentInHookSpace} from './utils';
+import { parse } from '@babel/parser';
+import traverse from '@babel/traverse';
 import {LOCAL_STORAGE_TRACE_UPDATES_ENABLED_KEY} from 'react-devtools-shared/src/constants';
 import {
   getAppendComponentStack,
@@ -202,17 +205,64 @@ function createPanelIfReactLoaded() {
           }
         };
 
-        function injectHookVariableNamesFunction(id, hookLog) {
-          // TODO Load source and source map, parse AST, mix in real names.
-          const namedHookLogPromise = new Promise((resolve, reject) => {
-            setTimeout(() => {
-              const newHookLog = hookLog.map(hook => {
-                return {...hook, name: 'hook-variable-name'};
+        function injectHookVariableNamesFunction(hookLog) {
+          console.log('injectHookVariableNamesFunction called with', hookLog);
+          // TODO : Handle subHooks case - How do we generate subHooks?
+          const uniqueFilenames = hookLog.map((hook) => hook.hookSource.fileName).filter((fileName, idx, fileNames) => fileNames.indexOf(fileName) === idx);
+          // For O(1) lookup of both sourceMapURLs and url given one of these
+          const sourceMapURLs= new Map();
+          const sourceURLs= new Map();
+          const newHookLog = []
+          // Get all the unique files mentioned in the hookLog 
+          Promise.all(uniqueFilenames.map((fileName) => fetchFileFromURL(fileName)))
+          .then((fileStreams) => {
+            // For each file, we need to obtain the corresponding sourceMapURL and fetch the contents of that file
+            fileStreams.forEach((fileStream) => {
+              const {url, text} = fileStream.data;
+              const sourceMapURL = getSourceMapURL(url, text);
+              sourceMapURLs.set(url, sourceMapURL);
+              sourceURLs.set(sourceMapURL, url);
+            });
+            const urls = fileStreams.map(fileStream => fileStream.data.url);
+            return Promise.all(urls.map(url => {
+              const sourceMapURL = sourceMapURLs.get(url);
+              return fetchFileFromURL(sourceMapURL);
+            }));
+          })
+          .then((sourceMaps) => {
+            const wasmMappingsURL = 'https://unpkg.com/source-map@0.7.3/lib/mappings.wasm';
+            SourceMapConsumer.initialize({ 'lib/mappings.wasm': wasmMappingsURL });
+            // For each sourceMapFile, we can now obtain the 
+            sourceMaps.forEach(sourceMap => {
+              const { url, text } = sourceMap.data;
+              const sourceMapAsJSON = JSON.parse(text);  
+              SourceMapConsumer.with(sourceMapAsJSON, null, consumer => {
+                const sourceURL = sourceURLs.get(url);
+                const relevantHooks = hookLog.filter((hook) => hook.hookSource.fileName === sourceURL);
+                return relevantHooks.map((hook) => {
+                  // Step 1: Get the contents of the source file
+                  // Step 2: Parse AST at original line and column number
+                  const {lineNumber, columnNumber} = hook.hookSource;
+                  const { line, source } = consumer.originalPositionFor({line: lineNumber, column: columnNumber});
+                  const sourceFileContents = consumer.sourceContentFor(source, true);
+                  const ast = parse(sourceFileContents, { sourceType: 'unambiguous', plugins: ['jsx', 'typescript']});
+                  const hooksFound = [];
+                  traverse(ast, {
+                    enter(path) {
+                      if (path.isVariableDeclarator() && presentInHookSpace(path, line)) {
+                        hooksFound.push(path);
+                      }
+                    }
+                  });
+                  return hooksFound;
+                })
+              }).then((hooksOfFile) => {
+                newHookLog.push(...hooksOfFile);
+                console.log(newHookLog);
               });
-              resolve(newHookLog);
-            }, 2000);
+            });
           });
-          return namedHookLogPromise;
+          return hookLog;
         }
 
         root = createRoot(document.createElement('div'));
