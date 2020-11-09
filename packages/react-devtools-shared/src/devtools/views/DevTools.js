@@ -37,6 +37,7 @@ import './root.css';
 import type {InspectedElement} from 'react-devtools-shared/src/devtools/views/Components/types';
 import type {FrontendBridge} from 'react-devtools-shared/src/bridge';
 import type {Source} from '../../../../shared/ReactElementType'
+import type {Thenable} from '../cache'
 
 export type BrowserTheme = 'dark' | 'light';
 export type TabID = 'components' | 'profiler';
@@ -46,14 +47,13 @@ type HookLogEntry = {
   value: mixed,
   ...
 };
-
-type HookLog = Array<HookLogEntry> | null
+export type HookLog = Array<HookLogEntry> | null;
 
 export type ViewElementSource = (
   id: number,
   inspectedElement: InspectedElement,
 ) => void;
-export type InjectHookVariableNamesFunction = (hookLog: HookLog) => Promise<HookLog>;
+export type InjectHookVariableNamesFunction = (hookLog: HookLog) => Thenable<HookLog>;
 export type ViewAttributeSource = (
   id: number,
   path: Array<string | number>,

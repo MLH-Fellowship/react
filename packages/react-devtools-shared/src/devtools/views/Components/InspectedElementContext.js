@@ -34,6 +34,7 @@ import type {
   Element,
   InspectedElement as InspectedElementFrontend,
 } from 'react-devtools-shared/src/devtools/views/Components/types';
+import type {HookLog} from 'react-devtools-shared/src/devtools/views/DevTools';
 import type {Resource, Thenable} from '../../cache';
 
 export type StoreAsGlobal = (id: number, path: Array<string | number>) => void;
@@ -95,6 +96,21 @@ const resource: Resource<
   {useWeakMap: true},
 );
 
+const hookResource: Resource<
+  InspectedElementFrontend,
+  InspectedElementFrontend,
+  Thenable<HookLog>,
+> = createResource(
+  (inspectedElement: InspectedElementFrontend) => {
+    const promise = new Promise(resolve => {
+      resolve(inspectedElement.hooks);
+    });
+    return promise;
+  },
+  (inspectedElement: InspectedElementFrontend) => inspectedElement,
+  {useWeakMap: true},
+);
+
 type Props = {|
   children: React$Node,
 |};
@@ -147,7 +163,14 @@ function InspectedElementContextController({children}: Props) {
     (id: number) => {
       const element = store.getElementByID(id);
       if (element !== null) {
-        return resource.read(element);
+        const inspectedElement = resource.read(element);
+        
+        // Read new hook object and set in inspected element
+        const namedHooks = hookResource.read(inspectedElement);
+        inspectedElement.hooks = namedHooks;
+        console.log('=== Inspected ===', inspectedElement);
+
+        return inspectedElement;
       } else {
         return null;
       }
@@ -260,13 +283,11 @@ function InspectedElementContextController({children}: Props) {
             state: hydrateHelper(state),
           };
 
-          // If injectHookVariableNamesFunction prop present, wait on new hook (with variable names) to resolve
-          // and replace old hooks structure with the new one
           if (injectHookVariableNamesFunction) {
-            const namedHooksPromise = injectHookVariableNamesFunction(hydrateHelper(hooks))
-            namedHooksPromise.then(namedHooks => {
-              inspectedElement.hooks = namedHooks
-            })
+            const namedHooksPromise = injectHookVariableNamesFunction(
+              hydrateHelper(hooks)
+            );
+            hookResource.write(inspectedElement, namedHooksPromise);
           }
 
           element = store.getElementByID(id);

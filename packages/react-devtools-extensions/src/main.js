@@ -203,16 +203,15 @@ function createPanelIfReactLoaded() {
         };
 
         function injectHookVariableNamesFunction(hookLog) {
-          const newHookLog = new Promise((resolve, reject) => {
+          const namedHookLogPromise = new Promise((resolve, reject) => {
             setTimeout(() => {
-              const newHook = hookLog.map((hook) => {
-                return {...hook, 'variableName':'parsed-variable-name'}
+              const newHookLog = hookLog.map((hook) => {
+                return {...hook, 'name':'hook-variable-name'}
               })
-              resolve(newHook)
-            }, 8000)
+              resolve(newHookLog)
+            }, 2000)
           })
-          console.log('injectHookVariableNamesFunction called with', newHookLog, hookLog)
-          return newHookLog
+          return namedHookLogPromise;
         }
 
         root = createRoot(document.createElement('div'));
