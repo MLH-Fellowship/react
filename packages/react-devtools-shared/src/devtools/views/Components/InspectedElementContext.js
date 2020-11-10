@@ -34,7 +34,10 @@ import type {
   Element,
   InspectedElement as InspectedElementFrontend,
 } from 'react-devtools-shared/src/devtools/views/Components/types';
-import type {HookLog} from 'react-devtools-shared/src/devtools/views/DevTools';
+import type {
+  InjectHookVariableNamesFunction,
+  HookLog,
+} from 'react-devtools-shared/src/devtools/views/DevTools';
 import type {Resource, Thenable} from '../../cache';
 
 export type StoreAsGlobal = (id: number, path: Array<string | number>) => void;
@@ -72,7 +75,7 @@ type InProgressRequest = {|
 |};
 
 const inProgressRequests: WeakMap<Element, InProgressRequest> = new WeakMap();
-const resource: Resource<
+const inspectedElementResource: Resource<
   Element,
   Element,
   InspectedElementFrontend,
@@ -96,18 +99,25 @@ const resource: Resource<
   {useWeakMap: true},
 );
 
-const hookResource: Resource<
+type NamedHooksResourceKey = [
+  Element,
   InspectedElementFrontend,
-  InspectedElementFrontend,
-  Thenable<HookLog>,
+  InjectHookVariableNamesFunction,
+];
+
+const namedHooksResource: Resource<
+  NamedHooksResourceKey,
+  Element,
+  HookLog,
 > = createResource(
-  (inspectedElement: InspectedElementFrontend) => {
-    const promise = new Promise(resolve => {
-      resolve(inspectedElement.hooks);
-    });
-    return promise;
+  (key: NamedHooksResourceKey) => {
+    // eslint-disable-next-line no-unused-vars
+    const [element, inspectedElement, injectHookVariableNamesFunction] = key;
+    const {id, hooks} = inspectedElement;
+    return injectHookVariableNamesFunction(id, hooks);
   },
-  (inspectedElement: InspectedElementFrontend) => inspectedElement,
+  // Key the WeakMap on the Element (in the Store) since it's stable.
+  (key: NamedHooksResourceKey) => key[0],
   {useWeakMap: true},
 );
 
@@ -118,7 +128,9 @@ type Props = {|
 function InspectedElementContextController({children}: Props) {
   const bridge = useContext(BridgeContext);
   const store = useContext(StoreContext);
-  const injectHookVariableNamesFunction = useContext(InjectHookVariableNamesFunctionContext).injectHookVariableNamesFunction
+  const {injectHookVariableNamesFunction} = useContext(
+    InjectHookVariableNamesFunctionContext,
+  );
   const storeAsGlobalCount = useRef(1);
 
   // Ask the backend to store the value at the specified path as a global variable.
@@ -163,12 +175,20 @@ function InspectedElementContextController({children}: Props) {
     (id: number) => {
       const element = store.getElementByID(id);
       if (element !== null) {
-        const inspectedElement = resource.read(element);
-        
-        // Read new hook object and set in inspected element
-        const namedHooks = hookResource.read(inspectedElement);
-        inspectedElement.hooks = namedHooks;
-        console.log('=== Inspected ===', inspectedElement);
+        const inspectedElement = inspectedElementResource.read(element);
+
+        // Mix additional hook name data into the inspected resource if we can.
+        if (
+          inspectedElement.hooks !== null &&
+          injectHookVariableNamesFunction !== null
+        ) {
+          inspectedElement.hooks = namedHooksResource.read([
+            element,
+            inspectedElement,
+            injectHookVariableNamesFunction,
+          ]);
+          inspectedElementResource.write(element, inspectedElement);
+        }
 
         return inspectedElement;
       } else {
@@ -210,7 +230,7 @@ function InspectedElementContextController({children}: Props) {
 
               fillInPath(inspectedElement, data.value, data.path, value);
 
-              resource.write(element, inspectedElement);
+              inspectedElementResource.write(element, inspectedElement);
 
               // Schedule update with React if the currently-selected element has been invalidated.
               if (id === selectedElementID) {
@@ -283,13 +303,6 @@ function InspectedElementContextController({children}: Props) {
             state: hydrateHelper(state),
           };
 
-          if (injectHookVariableNamesFunction) {
-            const namedHooksPromise = injectHookVariableNamesFunction(
-              hydrateHelper(hooks)
-            );
-            hookResource.write(inspectedElement, namedHooksPromise);
-          }
-
           element = store.getElementByID(id);
           if (element !== null) {
             const request = inProgressRequests.get(element);
@@ -300,7 +313,7 @@ function InspectedElementContextController({children}: Props) {
                 setCurrentlyInspectedElement(inspectedElement);
               });
             } else {
-              resource.write(element, inspectedElement);
+              inspectedElementResource.write(element, inspectedElement);
 
               // Schedule update with React if the currently-selected element has been invalidated.
               if (id === selectedElementID) {

@@ -52,6 +52,7 @@ export default function InspectedElementWrapper(_: Props) {
 
   const inspectedElement =
     inspectedElementID != null ? getInspectedElement(inspectedElementID) : null;
+  console.log('<InspectedElement> inspectedElement:', inspectedElement);
 
   const highlightElement = useCallback(() => {
     if (element !== null && inspectedElementID !== null) {

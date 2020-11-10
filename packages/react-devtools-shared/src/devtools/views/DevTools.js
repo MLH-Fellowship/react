@@ -36,8 +36,7 @@ import './root.css';
 
 import type {InspectedElement} from 'react-devtools-shared/src/devtools/views/Components/types';
 import type {FrontendBridge} from 'react-devtools-shared/src/bridge';
-import type {Source} from '../../../../shared/ReactElementType'
-import type {Thenable} from '../cache'
+import type {Thenable} from '../cache';
 
 export type BrowserTheme = 'dark' | 'light';
 export type TabID = 'components' | 'profiler';
@@ -53,7 +52,10 @@ export type ViewElementSource = (
   id: number,
   inspectedElement: InspectedElement,
 ) => void;
-export type InjectHookVariableNamesFunction = (hookLog: HookLog) => Thenable<HookLog>;
+export type InjectHookVariableNamesFunction = (
+  id: number,
+  hookLog: HookLog,
+) => Thenable<HookLog>;
 export type ViewAttributeSource = (
   id: number,
   path: Array<string | number>,
@@ -120,7 +122,7 @@ export default function DevTools({
   warnIfUnsupportedVersionDetected = false,
   viewAttributeSourceFunction,
   viewElementSourceFunction,
-  injectHookVariableNamesFunction
+  injectHookVariableNamesFunction,
 }: Props) {
   const [currentTab, setTab] = useLocalStorage<TabID>(
     'React::DevTools::defaultTab',
@@ -135,10 +137,10 @@ export default function DevTools({
 
   const injectHookVariableNames = useMemo(
     () => ({
-      injectHookVariableNamesFunction: injectHookVariableNamesFunction || null
+      injectHookVariableNamesFunction: injectHookVariableNamesFunction || null,
     }),
-    [injectHookVariableNamesFunction]
-  )
+    [injectHookVariableNamesFunction],
+  );
 
   const viewElementSource = useMemo(
     () => ({
@@ -211,7 +213,8 @@ export default function DevTools({
               componentsPortalContainer={componentsPortalContainer}
               profilerPortalContainer={profilerPortalContainer}>
               <ViewElementSourceContext.Provider value={viewElementSource}>
-                <InjectHookVariableNamesFunctionContext.Provider value={injectHookVariableNames}>
+                <InjectHookVariableNamesFunctionContext.Provider
+                  value={injectHookVariableNames}>
                   <TreeContextController>
                     <ProfilerContextController>
                       <div className={styles.DevTools} ref={devToolsRef}>
