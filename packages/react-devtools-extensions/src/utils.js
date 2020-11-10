@@ -1,7 +1,5 @@
 /* global chrome */
-
-// const fs = require('fs-extra');
-// const readline = require('readline');
+// import { NodePath } from "@babel/core";
 
 const IS_CHROME = navigator.userAgent.indexOf('Firefox') < 0;
 
@@ -32,40 +30,6 @@ export function getBrowserTheme(): BrowserTheme {
   }
 }
 
-/**
- * Util to read file as stream and resolve the desired line number.
- * Redundant, doesn't work in its current state.
- */
-export function extractLinefromSourceFile(
-  lineNumber: number,
-  filepath: string
-): Promise<any> {
-  return new Promise((resolve, reject) => {
-    let cursor = 0
-    const inputStream = fs.createReadStream(filepath)
-    const lineReader = readline.createInterface({ inputStream })
-
-    lineReader.on('line', function(line) {
-      if (cursor++ === lineNumber) {
-        lineReader.close()
-        inputStream.close()
-        resolve(line)
-      }
-    })
-    lineReader.on('error', reject)
-    inputStream.on('end', function() {
-      reject(new RangeError(
-        `Line ${lineNumber} doesn't exist in ${filepath}`
-      ))
-    })
-  })
-}
-
-export function parseLine(line: string): string {
-  const whitespaceRegex = /^\s+|\s+$/g;
-  return line.replace(whitespaceRegex, '');
-}
-
 export function fetchFileFromURL(url: string): Promise<any> {
   return new Promise((resolve, reject) => {
     fetch(url).then((res) => {
@@ -90,3 +54,16 @@ export function isValidUrl(possibleURL) {
   }
   return true;
 }
+
+// type Details = {
+//   line: number, 
+//   column: number,
+//   source: string
+// }
+
+// export function presentInHookSpace(nodePath: NodePath, details: Details): boolean {
+//   const bufferLineSpace = 1
+//   const {line} = details
+//   const locationOfNode = nodePath.node.loc
+//   return locationOfNode.start.line >= (line-bufferLineSpace) && locationOfNode.end.line <= (line+bufferLineSpace)
+// }

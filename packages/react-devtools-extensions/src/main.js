@@ -5,7 +5,9 @@ import {unstable_createRoot as createRoot, flushSync} from 'react-dom';
 import Bridge from 'react-devtools-shared/src/bridge';
 import Store from 'react-devtools-shared/src/devtools/store';
 import { SourceMapConsumer } from 'source-map';
-import {getBrowserName, getBrowserTheme, fetchFileFromURL, isValidUrl, extractLinefromSourceFile, parseLine} from './utils';
+import {getBrowserName, getBrowserTheme, fetchFileFromURL, isValidUrl, presentInHookSpace} from './utils';
+import { parse } from '@babel/parser';
+import traverse from '@babel/traverse';
 import {LOCAL_STORAGE_TRACE_UPDATES_ENABLED_KEY} from 'react-devtools-shared/src/constants';
 import {
   getAppendComponentStack,
@@ -205,8 +207,7 @@ function createPanelIfReactLoaded() {
 
         function injectHookVariableNamesFunction(hookLog) {
           console.log('injectHookVariableNamesFunction called with', hookLog)
-          hookLog.map((hook) => {
-            console.log(hook)
+          hookLog.map((hook, idx) => {
             const {fileName, lineNumber, columnNumber} = hook.hookSource
             fetchFileFromURL(fileName)
               .then((fileData) => {
@@ -226,10 +227,13 @@ function createPanelIfReactLoaded() {
                    * in the source code.
                    */
                   const sourceMapJSON = JSON.parse(sourceMap);
+                  /**
+                   * TODO: Remove this URL and bundle the WASM file along with the extension to access using the fileResources API
+                   */
                   const WasmMappingsURL = 'https://unpkg.com/source-map@0.7.3/lib/mappings.wasm'
                   SourceMapConsumer.initialize({ 'lib/mappings.wasm': WasmMappingsURL });
                   Promise.resolve(SourceMapConsumer.with(sourceMapJSON, null, consumer => {
-                    const {source, line, column} = consumer.originalPositionFor({
+                    const detailsOfHookAtSource = consumer.originalPositionFor({
                         line: lineNumber,
                         column: columnNumber
                     })
@@ -240,13 +244,17 @@ function createPanelIfReactLoaded() {
                      * use the line number to index the desired line of code and parse it to truncate
                      * white space pending. Using a custom regex will fetch us the variable name.
                      */
-                    const newLineRegex = /\r?\n/;
-                    const sourceFileContentsArray = (consumer.sourceContentFor(source, true)).split(newLineRegex);
-                    const parsedTargetLine = parseLine(sourceFileContentsArray[line-1]);
-                    console.log(parsedTargetLine);
-                    
+                    const sourceFileContents = consumer.sourceContentFor(detailsOfHookAtSource.source, true)
+                    const ast = parse(sourceFileContents, {sourceType: 'unambiguous', plugins: ['jsx', 'typescript']})
+                    traverse(ast, {
+                      enter(path) {
+                        if (path.isVariableDeclarator()) {
+                          console.log({path, idx});
+                        }
+                      }
+                    })
                     /** 
-                     * Approach 2:
+                     * Approach 2(TODO):
                      * Creating a read stream from the file path and reading it line by line.
                      * Doesn't work with fs and readline, possibly because browser doesn't support these.
                      * FileReader API might be a possible workaround, but MDN says that it can only read

@@ -47,7 +47,6 @@
   },
   "dependencies": {
     "fs": "*",
-    "readline": "*",
     "source-map": "^0.7.3",
     "web-ext": "^4"
   }
