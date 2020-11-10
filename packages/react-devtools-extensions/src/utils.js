@@ -35,7 +35,9 @@ export function fetchFileFromURL(url: string): Promise<any> {
     fetch(url).then((res) => {
       if (res.ok) {
         res.text().then((text) => {
-          resolve(text)
+          resolve({data: {
+            url, text
+          }})
         }).catch((err) => {
           reject(null)
         })
@@ -46,7 +48,7 @@ export function fetchFileFromURL(url: string): Promise<any> {
   })
 }
 
-export function isValidUrl(possibleURL) {
+function isValidUrl(possibleURL) {
   try {
     new URL(possibleURL);
   } catch (_) {
@@ -55,15 +57,24 @@ export function isValidUrl(possibleURL) {
   return true;
 }
 
-// type Details = {
-//   line: number, 
-//   column: number,
-//   source: string
-// }
+export function getSourceMapURL(url: string, urlResponse: string): string {
+  const sourceMappingUrlRegExp = /\/\/[#@] ?sourceMappingURL=([^\s'"]+)\s*$/mg
+  const sourceMappingURLInArray = urlResponse.match(sourceMappingUrlRegExp);
+  if (sourceMappingURLInArray.length > 1) {
+    // More than one source map URL cannot be detected
+    return; 
+  }
+  // The match will look like sourceMapURL=main.chunk.js, so we want the second element
+  const sourceMapURL = sourceMappingURLInArray[0].split('=')[1];
+  const baseURL = url.slice(0, url.lastIndexOf('/'));
+  const completeSourceMapURL = `${baseURL}/${sourceMapURL}`;
+  if (isValidUrl(completeSourceMapURL)) {
+    return completeSourceMapURL;
+  }
+}
 
-// export function presentInHookSpace(nodePath: NodePath, details: Details): boolean {
-//   const bufferLineSpace = 1
-//   const {line} = details
-//   const locationOfNode = nodePath.node.loc
-//   return locationOfNode.start.line >= (line-bufferLineSpace) && locationOfNode.end.line <= (line+bufferLineSpace)
-// }
+export function presentInHookSpace(nodePath: NodePath, lineNumber: number): boolean {
+  const bufferLineSpace = 0;
+  const locationOfNode = nodePath.node.loc;
+  return locationOfNode.start.line >= (lineNumber-bufferLineSpace) && locationOfNode.end.line <= (lineNumber+bufferLineSpace);
+}

@@ -5,7 +5,7 @@ import {unstable_createRoot as createRoot, flushSync} from 'react-dom';
 import Bridge from 'react-devtools-shared/src/bridge';
 import Store from 'react-devtools-shared/src/devtools/store';
 import { SourceMapConsumer } from 'source-map';
-import {getBrowserName, getBrowserTheme, fetchFileFromURL, isValidUrl, presentInHookSpace} from './utils';
+import {getBrowserName, getBrowserTheme, fetchFileFromURL, getSourceMapURL, presentInHookSpace} from './utils';
 import { parse } from '@babel/parser';
 import traverse from '@babel/traverse';
 import {LOCAL_STORAGE_TRACE_UPDATES_ENABLED_KEY} from 'react-devtools-shared/src/constants';
@@ -206,68 +206,63 @@ function createPanelIfReactLoaded() {
         };
 
         function injectHookVariableNamesFunction(hookLog) {
-          console.log('injectHookVariableNamesFunction called with', hookLog)
-          hookLog.map((hook, idx) => {
-            const {fileName, lineNumber, columnNumber} = hook.hookSource
-            fetchFileFromURL(fileName)
-              .then((fileData) => {
-                /**
-                * TODO: Use a regex to obtain the sourceMappingURL
-                * const sourceMappingURLRegex = '/~//[#@]\s(source(?:Mapping)?URL)=\s*(\S+)~/g'
-                */
-                const sourceMapPartialURL = fileData.split('sourceMappingURL=')[1];
-                if (!isValidUrl(fileName)) {
-                  return;
-                }
-                const lastIndexOfBackslash = fileName.lastIndexOf('/');
-                const sourceMapURL = fileName.substr(0,lastIndexOfBackslash+1) + sourceMapPartialURL;
-                fetchFileFromURL((sourceMapURL)).then((sourceMap) => {
-                  /**
-                   * Utilise sourcemap to pinpoint filename and coordinates of hook
-                   * in the source code.
-                   */
-                  const sourceMapJSON = JSON.parse(sourceMap);
-                  /**
-                   * TODO: Remove this URL and bundle the WASM file along with the extension to access using the fileResources API
-                   */
-                  const WasmMappingsURL = 'https://unpkg.com/source-map@0.7.3/lib/mappings.wasm'
-                  SourceMapConsumer.initialize({ 'lib/mappings.wasm': WasmMappingsURL });
-                  Promise.resolve(SourceMapConsumer.with(sourceMapJSON, null, consumer => {
-                    const detailsOfHookAtSource = consumer.originalPositionFor({
-                        line: lineNumber,
-                        column: columnNumber
-                    })
-                    /**
-                     * Approach 1:
-                     * Obtain source file contents as string (using the API) and split on newline characters.
-                     * Since the resultant array represents line by line contents of the file, we can simply
-                     * use the line number to index the desired line of code and parse it to truncate
-                     * white space pending. Using a custom regex will fetch us the variable name.
-                     */
-                    const sourceFileContents = consumer.sourceContentFor(detailsOfHookAtSource.source, true)
-                    const ast = parse(sourceFileContents, {sourceType: 'unambiguous', plugins: ['jsx', 'typescript']})
-                    traverse(ast, {
-                      enter(path) {
-                        if (path.isVariableDeclarator()) {
-                          console.log({path, idx});
-                        }
-                      }
-                    })
-                    /** 
-                     * Approach 2(TODO):
-                     * Creating a read stream from the file path and reading it line by line.
-                     * Doesn't work with fs and readline, possibly because browser doesn't support these.
-                     * FileReader API might be a possible workaround, but MDN says that it can only read
-                     * from a local filesystem, and not fron just any filesystem (provided file path)
-                    */
-                    // const targetLine = Promise.resolve(extractLinefromSourceFile(line, source))
-                    // console.log(targetLine)
-                  }))
-                })
-
-              })
+          console.log('injectHookVariableNamesFunction called with', hookLog);
+          // TODO : Handle subHooks case - How do we generate subHooks?
+          const uniqueFilenames = hookLog.map((hook) => hook.hookSource.fileName).filter((fileName, idx, fileNames) => fileNames.indexOf(fileName) === idx);
+          // For O(1) lookup of both sourceMapURLs and url given one of these
+          const sourceMapURLs= new Map();
+          const sourceURLs= new Map();
+          const newHookLog = []
+          // Get all the unique files mentioned in the hookLog 
+          Promise.all(uniqueFilenames.map((fileName) => fetchFileFromURL(fileName)))
+          .then((fileStreams) => {
+            // For each file, we need to obtain the corresponding sourceMapURL and fetch the contents of that file
+            fileStreams.forEach((fileStream) => {
+              const {url, text} = fileStream.data;
+              const sourceMapURL = getSourceMapURL(url, text);
+              sourceMapURLs.set(url, sourceMapURL);
+              sourceURLs.set(sourceMapURL, url);
+            });
+            const urls = fileStreams.map(fileStream => fileStream.data.url);
+            return Promise.all(urls.map(url => {
+              const sourceMapURL = sourceMapURLs.get(url);
+              return fetchFileFromURL(sourceMapURL);
+            }));
           })
-          return hookLog
+          .then((sourceMaps) => {
+            const wasmMappingsURL = 'https://unpkg.com/source-map@0.7.3/lib/mappings.wasm';
+            SourceMapConsumer.initialize({ 'lib/mappings.wasm': wasmMappingsURL });
+            // For each sourceMapFile, we can now obtain the 
+            sourceMaps.forEach(sourceMap => {
+              const { url, text } = sourceMap.data;
+              const sourceMapAsJSON = JSON.parse(text);  
+              SourceMapConsumer.with(sourceMapAsJSON, null, consumer => {
+                const sourceURL = sourceURLs.get(url);
+                const relevantHooks = hookLog.filter((hook) => hook.hookSource.fileName === sourceURL);
+                return relevantHooks.map((hook) => {
+                  // Step 1: Get the contents of the source file
+                  // Step 2: Parse AST at original line and column number
+                  const {lineNumber, columnNumber} = hook.hookSource;
+                  const { line, source } = consumer.originalPositionFor({line: lineNumber, column: columnNumber});
+                  const sourceFileContents = consumer.sourceContentFor(source, true);
+                  const ast = parse(sourceFileContents, { sourceType: 'unambiguous', plugins: ['jsx', 'typescript']});
+                  const hooksFound = [];
+                  traverse(ast, {
+                    enter(path) {
+                      if (path.isVariableDeclarator() && presentInHookSpace(path, line)) {
+                        hooksFound.push(path);
+                      }
+                    }
+                  });
+                  return hooksFound;
+                })
+              }).then((hooksOfFile) => {
+                newHookLog.push(...hooksOfFile);
+                console.log(newHookLog);
+              });
+            });
+          });
+          return hookLog;
         }
 
         root = createRoot(document.createElement('div'));
