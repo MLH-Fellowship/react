@@ -30,6 +30,12 @@ export function getBrowserTheme(): BrowserTheme {
   }
 }
 
+// TODO: JSDOC for utils below
+
+/**
+* url: url to fetch
+* text: stringified response of fetch()
+*/
 export function fetchFileFromURL(url: string): Promise<any> {
   return new Promise((resolve, reject) => {
     fetch(url).then((res) => {
@@ -73,8 +79,65 @@ export function getSourceMapURL(url: string, urlResponse: string): string {
   }
 }
 
-export function presentInHookSpace(nodePath: NodePath, lineNumber: number): boolean {
+export function presentInHookSpace(nodePath: NodePath, lineNumber: number, columnNumber: number): boolean {
   const bufferLineSpace = 0;
   const locationOfNode = nodePath.node.loc;
-  return locationOfNode.start.line >= (lineNumber-bufferLineSpace) && locationOfNode.end.line <= (lineNumber+bufferLineSpace);
+  console.log(lineNumber, locationOfNode);
+  return (locationOfNode.start.line >= (lineNumber-bufferLineSpace) && locationOfNode.end.line <= (lineNumber+bufferLineSpace));
+}
+
+export function isHookDeclaration(path, supportedHooks) {
+  const nodePathInit = path.node.init;
+  if (nodePathInit.type === 'CallExpression') {
+    const callee = nodePathInit.callee;
+
+    if (callee.type === 'Identifier') {
+      return supportedHooks.includes(callee.name);
+    } else if (callee.type === 'MemberExpression') {
+      return callee.object.name === 'React' && supportedHooks.includes(callee.property.name);
+    }
+  } else if (nodePathInit.type === 'MemberExpression') {
+    return true;
+  }
+  return false;
+}
+
+export function nodePathIdType(path) {
+  return path.node.id.type;
+}
+
+export function nodePathInitType(path) {
+  return path.node.init.type;
+}
+
+export function isReactHook(path, supportedHooks) {
+  const pathInitType = nodePathInitType(path);
+
+  if (pathInitType !== 'CallExpression') {
+    return false;
+  }
+  const callee = path.node.init.callee;
+  
+  if (callee.type === 'Identifier') {
+    return supportedHooks.includes(callee.name);
+  } else if (callee.type === 'MemberExpression') {
+    return callee.object.name === 'React' && supportedHooks.includes(callee.property.name);
+  }
+  return false;
+}
+
+export function nodeLocation(path, line) {
+  return (line === path.node.loc.start.line);
+}
+
+export function isStateOrReducerHook(path) {
+  const sampleSpace = ['useState', 'useReducer'];
+  const callee = path.node.init.callee;
+  
+  if (callee.type === 'Identifier') {
+    return sampleSpace.includes(callee.name);
+  } else if (callee.type === 'MemberExpression') {
+    return callee.object.name === 'React' && sampleSpace.includes(callee.property.name);
+  }
+  return false; 
 }
