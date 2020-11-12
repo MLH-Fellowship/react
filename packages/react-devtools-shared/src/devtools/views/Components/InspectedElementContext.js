@@ -187,6 +187,7 @@ function InspectedElementContextController({children}: Props) {
             inspectedElement,
             injectHookVariableNamesFunction,
           ]);
+          namedHooksResource.invalidate(element);
           inspectedElementResource.write(element, inspectedElement);
         }
 

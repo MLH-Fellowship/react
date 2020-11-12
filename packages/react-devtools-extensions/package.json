@@ -46,8 +46,6 @@
     "webpack-dev-server": "^3.10.3"
   },
   "dependencies": {
-    "fs": "*",
-    "source-map": "^0.7.3",
     "web-ext": "^4"
   }
 }

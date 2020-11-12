@@ -22,6 +22,11 @@ import {
   StrictMode,
   Suspense,
 } from 'react-is';
+import traverse, { NodePath, Node } from '@babel/traverse';
+import { parse } from '@babel/parser';
+import {File} from '@babel/types';
+import {SourceMapConsumer, BasicSourceMapConsumer, IndexedSourceMapConsumer} from 'source-map';
+
 import {REACT_SUSPENSE_LIST_TYPE as SuspenseList} from 'shared/ReactSymbols';
 import {
   TREE_OPERATION_ADD,
@@ -764,3 +769,618 @@ export function formatDataForPreview(
       }
   }
 }
+
+
+// Code added for InjectHookVariableNamesFunction
+
+type HookSource = {
+  lineNumber: number | null,
+  columnNumber: number | null,
+  fileName: string | null,
+  functionName: string | null,
+}
+type HooksNode = {
+  id: number | null,
+  isStateEditable: boolean,
+  name: string,
+  value: mixed,
+  subHooks: Array<HooksNode>,
+  hookSource: HookSource,
+  ...
+};
+
+type HooksTree = Array<HooksNode>;
+
+type DownloadedFile = {
+  data: {
+    url: string, 
+    text: string
+  }
+}
+
+type SourceConsumer = BasicSourceMapConsumer | IndexedSourceMapConsumer;
+
+type SourceFileASTWithHookDetails = {
+  sourceFileAST: File, 
+  line: number,
+  source: string
+};
+
+type FileMappings = Map <string, string>;
+
+const AST_NODE_TYPES = Object.freeze({
+  CALL_EXPRESSION: 'CallExpression',
+  MEMBER_EXPRESSION: 'MemberExpression',
+  ARRAY_PATTERN: 'ArrayPattern',
+  IDENTIFIER: 'Identifier',
+  NUMERIC_LITERAL: 'NumericLiteral'
+})
+
+/**
+ * Used to obtain the source filenames of Hooks
+ * @param {HooksTree} hookLog The hook tree returned by the React Application 
+ * @returns {string[]} Filenames
+ */
+export function getUniqueFileNames(hookLog: HooksTree): string[] {
+  if (hookLog.length <= 0) {
+    return []
+  }
+
+  let uniqueFileNames: Set<string> = new Set()
+  hookLog.forEach(({hookSource, subHooks}) => {
+    const {fileName} = hookSource
+    if (fileName) {
+      uniqueFileNames.add(fileName)
+    }
+
+    if (subHooks.length > 0) {
+      uniqueFileNames = new Set([...uniqueFileNames, ...getUniqueFileNames(subHooks)])
+    }
+  })
+  return Array.from(uniqueFileNames)
+}
+
+/**
+ * Perform a GET request on the URL and return an object of type DownloadedFile
+ * @param {string} url
+ * @returns Promisfied URL and its contents
+ */
+export function fetchFile(url: string): Promise<DownloadedFile> {
+  return new Promise((resolve, reject) => {
+    fetch(url).then((res) => {
+      if (res.ok) {
+        res.text().then((text) => {
+          resolve({data: {
+            url, text
+          }})
+        }).catch((err) => {
+          reject(null)
+        })
+      } else {
+        reject(null)
+      }
+    })
+  })
+};
+
+
+/**
+ * Check if the URL is a valid one
+ * @param {string} possibleURL Url to check
+ * @returns {boolean} Is the URL indeed a valid URL
+ */
+function isValidUrl(possibleURL: string): boolean {
+  try {
+    new URL(possibleURL);
+  } catch (_) {
+    return false;  
+  }
+  return true;
+}
+
+/**
+ * Obtain the source map URL given the file contents and the url of the file
+ * @param {string} url 
+ * @param {string} urlResponse 
+ */
+export function getSourceMapURL(url: string, urlResponse: string): string {
+  const sourceMappingUrlRegExp = /\/\/[#@] ?sourceMappingURL=([^\s'"]+)\s*$/mg
+  const sourceMappingURLInArray = urlResponse.match(sourceMappingUrlRegExp);
+  if (sourceMappingURLInArray && sourceMappingURLInArray.length > 1) {
+    // More than one source map URL cannot be detected
+    throw new Error('More than source map detected in the source file') 
+  }
+  // The match will look like sourceMapURL=main.chunk.js, so we want the second element
+  const sourceMapURL = sourceMappingURLInArray[0].split('=')[1];
+  const baseURL = url.slice(0, url.lastIndexOf('/'));
+  const completeSourceMapURL = `${baseURL}/${sourceMapURL}`;
+  if (!isValidUrl(completeSourceMapURL)) {
+    throw new Error('Invalid URL created')
+  }
+  return completeSourceMapURL
+};
+
+
+/**
+ * TODO: Bundle WASM in extension static files and use those instead of versioned URLs
+ */
+function initialiseSourceMaps() {
+  const wasmMappingsURL = 'https://unpkg.com/source-map@0.7.3/lib/mappings.wasm';
+  SourceMapConsumer.initialize({ 'lib/mappings.wasm': wasmMappingsURL });
+}
+
+/**
+ * Add the variable names by parsing source maps
+ * @param {HookTree} hookLog The hook tree returned by the React Application 
+ * @param {*} sourceMaps SourceMaps of all the files referenced in the hookLog
+ */
+export function modifyHooksToAddVariableNames(hookLog: HooksTree, sourceMaps: DownloadedFile[], sourceMapUrls: FileMappings, sourceFileUrls: FileMappings): Promise<HooksTree> {
+  initialiseSourceMaps()
+
+  // For each sourceMapFile, we can now obtain the 
+  return Promise.all(sourceMaps.map(sourceMap => {
+    // Obtain contents and URL of the source map
+    const { url, text } = sourceMap.data;
+    const sourceMapAsJSON = JSON.parse(text);
+
+    // This map consists of all the AST Nodes that COULD be hooks
+    const potentialHooksOfFile: Map<string, Array<NodePath>> = new Map();
+    const astForSourceFiles: Map<string, File> = new Map();
+
+    return SourceMapConsumer.with(sourceMapAsJSON, null, (consumer: SourceConsumer) => {
+      const sourceUrl = sourceFileUrls.get(url);
+      if (!sourceUrl) {
+        throw new Error(`Could not find source url for the map url ${url}`)
+      }
+      // TODO: We need to recursively obtain all the hooks in the
+      const relevantHooks = getRelevantHooksForFile(hookLog, sourceUrl);
+      return relevantHooks.map((hook) => {
+        const {lineNumber, columnNumber} = hook.hookSource;
+        if (!(lineNumber && columnNumber)) {
+          throw new Error(`Line and Column Numbers could not be found for hook`)
+        }
+        const {sourceFileAST, line, source} = getASTFromSourceFile(consumer, lineNumber, columnNumber, astForSourceFiles);
+        
+        let potentialHooksFound: NodePath[] = potentialHooksOfFile.get(source) || [];
+
+        if (!(potentialHooksFound && potentialHooksFound.length > 0)) {
+          potentialHooksFound = getPotentialHookDeclarationsFromAST(sourceFileAST);
+
+          // TODO: handle mismatch in number of hooks (conditional hook case?) - Cannot check relevantHooks.length count to match
+          // as relevantHooks point to hooks for min file 'main.chunk.js' while hookDeclarationCount points to hooks of source file 'App.js'
+          // const hookDeclarationsCount = getHookDeclarationsCountInFile(potentialHooksFound);
+          // if (relevantHooks.length !== hookDeclarationsCount) {
+          //   // throw error, escape the promise chain
+          //   throw new Error('Hooks found in source do not match hooks found in component');
+          // }
+          // hash potentialHooks array for current source to prevent parsing in following iterations
+          potentialHooksOfFile.set(source, potentialHooksFound);
+        }
+
+        // Iterate through potential hooks and try to find the current hook.
+        // potentialReactHookASTNode will contain declarations of the form const X = useState(0);
+        // where X could be an identifier or an array pattern (destructuring syntax)
+        const potentialReactHookASTNode: NodePath = potentialHooksFound
+          .find(node => checkNodeLocation(node, line) && isConfirmedHookDeclaration(node));
+
+        if (!potentialReactHookASTNode) {
+          throw new Error(`No Potential React Hook found at line ${line}`);
+        }
+
+        // nodesAssociatedWithReactHookASTNode could directly be a used to obtain the hook variable name
+        // depending on the type of potentialReactHookASTNode
+        try {
+          const nodesAssociatedWithReactHookASTNode: NodePath[] = getFilteredHookASTNodes(potentialReactHookASTNode, potentialHooksFound, source, potentialHooksOfFile);
+
+          const newHook: HooksNode = getHookNodeWithInjectedVariableName(hook, nodesAssociatedWithReactHookASTNode, potentialReactHookASTNode);
+          return newHook;
+
+        } catch (e) {
+          console.log('error: ', e, ' hook: ', hook);
+          return hook;
+        }
+      });
+    });
+  }));
+}
+
+
+
+/**
+ * Catch all identifiers that begin with "use" followed by an uppercase Latin
+ * character to exclude identifiers like "user".
+ * 
+ * @param{string} s
+ * @return {boolean}
+ */
+function isHookName(s: string): boolean {
+  return /^use[A-Z0-9].*$/.test(s);
+}
+
+/**
+ * We consider hooks to be a hook name identifier or a member expression
+ * containing a hook name.
+ * 
+ * @param {Node} node
+ * @return {boolean}
+ */
+function isHook(node: Node): boolean {
+  if (node.type === AST_NODE_TYPES.IDENTIFIER) {
+    return isHookName(node.name);
+  } else if (
+    node.type === AST_NODE_TYPES.MEMBER_EXPRESSION &&
+    !node.computed &&
+    isHook(node.property)
+  ) {
+    const obj = node.object;
+    const isPascalCaseNameSpace = /^[A-Z].*/;
+    return obj.type === AST_NODE_TYPES.IDENTIFIER && isPascalCaseNameSpace.test(obj.name);
+  } else {
+    return false;
+  }
+}
+
+/**
+ * Check whether 'node' is hook decalration of form useState(0); OR React.useState(0);
+ *
+ * @param {Node} node
+ * @param {string} functionName
+ * @return {boolean}
+ */
+function isReactFunction(node: Node, functionName: string): boolean {
+  return (
+    node.name === functionName ||
+    (node.type === 'MemberExpression' &&
+      node.object.name === 'React' &&
+      node.property.name === functionName)
+  );
+}
+
+/**
+ * Returns an AST for the source file contents
+ *
+ * @param {string} fileContents
+ * @return {*} 
+ */
+function getASTFromSourceFileContents(fileContents: string) {
+  return parse(fileContents, { sourceType: 'unambiguous', plugins: ['jsx', 'typescript']});
+}
+
+/**
+ * Check if 'path' contains declaration of the form const X = useState(0);
+ *
+ * @param {NodePath} path
+ * @return {boolean}
+ */
+function isConfirmedHookDeclaration(path: NodePath): boolean {
+  const node = path.node.init;
+  if (node.type !== AST_NODE_TYPES.CALL_EXPRESSION) {
+    return false;
+  }
+  const callee = node.callee;
+  return isHook(callee);
+}
+
+/**
+ * Check if the line number of the source map and the hook match
+ * 
+ * @param {NodePath} path AST NodePath
+ * @param {number} line The line number provided by source maps
+ */
+function checkNodeLocation(path: NodePath, line: number): boolean {
+  const locationOfNode = path.node.loc;
+  return (line === locationOfNode.start.line);
+}
+
+/**
+ * Check if 'path' is either State or Reducer hook
+ * 
+ * @param {NodePath} path
+ * @return {boolean}
+ */
+function isStateOrReducerHook(path: NodePath): boolean { 
+  const callee = path.node.init.callee;
+  return isReactFunction(callee, 'useState') ||
+    isReactFunction(callee, 'useReducer');
+}
+
+/**
+ * Used to calculate the possible number of hooks in a File
+ * 
+ * @param {NodePath[]} potentialHooks AST nodes that COULD be React Hooks
+ * @return {number}
+ */
+function getHookDeclarationsCountInFile(potentialHooks: NodePath[]): number {
+  let hookDeclarationsCount = 0;
+  potentialHooks.forEach(path => {
+    if (
+      path.node.init.type === AST_NODE_TYPES.CALL_EXPRESSION &&
+      isHook(path.node.init.callee)
+    ) {
+      hookDeclarationsCount += 1;
+    }
+  });
+  return hookDeclarationsCount;
+}
+
+/**
+ * @param {File} sourceAST
+ * @return {NodePath[]}
+ */
+function getPotentialHookDeclarationsFromAST(sourceAST: File): NodePath[] {
+  const potentialHooksFound: NodePath[] = [];
+  traverse(sourceAST, {
+    enter(path) {
+      if (
+          path.isVariableDeclarator() &&
+          isPotentialHookDeclaration(path)
+      ) {
+          potentialHooksFound.push(path);
+      }
+    }
+  });
+  return potentialHooksFound;
+}
+
+/**
+ * Check if the AST Node COULD be a React Hook
+ * 
+ * @param {NodePath} path An AST Node
+ * @return {boolean}
+ */
+function isPotentialHookDeclaration(path: NodePath): boolean {
+  // The array potentialHooksFound will contain all potential hook declaration cases we support
+  const nodePathInit = path.node.init;
+  if (nodePathInit.type === AST_NODE_TYPES.CALL_EXPRESSION) {
+    // CASE: CallExpression
+    // 1. const [count, setCount] = useState(0); -> destructured pattern
+    // 2. const [A, setA] = useState(0), const [B, setB] = useState(0); -> multiple inline declarations
+    // 3. const [
+    //      count,
+    //      setCount
+    //    ] = useState(0); -> multiline hook declaration
+    // 4. const ref = useRef(null); -> generic hooks
+    const callee = nodePathInit.callee;
+    return isHook(callee);
+  } else if (
+    nodePathInit.type === AST_NODE_TYPES.MEMBER_EXPRESSION ||
+    nodePathInit.type === AST_NODE_TYPES.IDENTIFIER
+  ) {
+    // CASE: MemberExpression
+    //    const countState = React.useState(0);
+    //    const count = countState[0];
+    //    const setCount = countState[1]; -> Accessing members following hook declaration
+
+    // CASE: Identifier
+    //    const countState = React.useState(0);
+    //    const [count, setCount] = countState; ->  destructuring syntax following hook declaration
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Check whether hookNode of a declaration contains obvious variable name
+ * 
+ * @param {NodePath} hookNode 
+ * @return {boolean}
+ */
+function nodeContainsHookVariableName(hookNode: NodePath): boolean {
+  // We determine cases where variable names are obvious in declarations. Examples:
+  // const [tick, setTick] = useState(1); OR const ref = useRef(null);
+  // Here tick/ref are obvious hook variables in the hook declaration node itself
+  // 1. True for satisfying above cases
+  // 2. False for everything else. Examples:
+  //    const countState = React.useState(0);
+  //    const count = countState[0];
+  //    const setCount = countState[1]; -> not obvious, hook variable can't be determined
+  //                                       from the hook declaration node alone
+    const node = hookNode.node.id;
+    if (
+      (
+        node.type === AST_NODE_TYPES.ARRAY_PATTERN &&
+        isStateOrReducerHook(hookNode)
+      ) || (
+        node.type === AST_NODE_TYPES.IDENTIFIER &&
+        !isStateOrReducerHook(hookNode)
+      )
+    ) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Returns all AST Nodes associated with 'potentialReactHookASTNode'
+ *
+ * @param {NodePath} potentialReactHookASTNode
+ * @param {NodePath[]} potentialHooksFound
+ * @param {string} source
+ * @param {Map<string, Array<NodePath>>} potentialHooksOfFile
+ * @return {NodePath[]}  nodesAssociatedWithReactHookASTNode
+ */
+function getFilteredHookASTNodes(potentialReactHookASTNode: NodePath, potentialHooksFound: NodePath[], source: string, potentialHooksOfFile: Map<string, Array<NodePath>>): NodePath[] {
+  // Remove targetHook from potentialHooks array since its purpose is served. 
+  // Also to clean the potentialHooks array for further filtering member nodes down the line.
+  const hookIdx = potentialHooksFound.indexOf(potentialReactHookASTNode);
+  if (hookIdx !== -1) {
+    potentialHooksFound.splice(hookIdx, 1);
+    potentialHooksOfFile.set(source, potentialHooksFound);
+  }
+
+  let nodesAssociatedWithReactHookASTNode: NodePath[] = [];
+  if (nodeContainsHookVariableName(potentialReactHookASTNode)) {
+    // Case 1.
+    // Directly usable Node -> const ref = useRef(null);
+    //                      -> const [tick, setTick] = useState(1);
+    nodesAssociatedWithReactHookASTNode.unshift(potentialReactHookASTNode);
+  } else {
+    // Case 2.
+    // Indirectly usable Node -> const tickState = useState(1);
+    //                           [tick, setTick] = tickState;
+    //                        -> const tickState = useState(1);
+    //                           const tick = tickState[0];
+    //                           const setTick = tickState[1];
+    nodesAssociatedWithReactHookASTNode = potentialHooksFound
+      .filter(hookNode => filterMemberNodesOfTargetHook(potentialReactHookASTNode, hookNode));
+  }
+  return nodesAssociatedWithReactHookASTNode;
+}
+
+/**
+ * checks whether hookNode is a member of targetHookNode
+ *
+ * @param {NodePath} targetHookNode
+ * @param {NodePath} hookNode
+ * @return {boolean} 
+ */
+function filterMemberNodesOfTargetHook(targetHookNode: NodePath, hookNode: NodePath): boolean {
+    const targetHookName = targetHookNode.node.id.name;
+    return targetHookName === hookNode.node.init.object?.name ||
+        targetHookName === hookNode.node.init.name;
+}
+
+/**
+ * Returns Hook Node with injected variable name
+ *
+ * @param {HooksNode} originalHook
+ * @param {NodePath[]} nodesAssociatedWithReactHookASTNode
+ * @param {NodePath} potentialReactHookASTNode
+ * @return {HooksNode} new hook with variable name injected
+ */
+function getHookNodeWithInjectedVariableName(originalHook: HooksNode, nodesAssociatedWithReactHookASTNode: NodePath[], potentialReactHookASTNode: NodePath): HooksNode {
+  let hookVariableName: string | null;
+
+  switch (nodesAssociatedWithReactHookASTNode.length) {
+    case 1:
+      // CASE 1A (nodesAssociatedWithReactHookASTNode[0] !== potentialReactHookASTNode): 
+      // const flagState = useState(true); -> later referenced as 
+      // const [flag, setFlag] = flagState;
+      //
+      // CASE 1B (nodesAssociatedWithReactHookASTNode[0] === potentialReactHookASTNode):
+      // const [flag, setFlag] = useState(true); -> we have access to the hook variable
+      //                                            straight away
+      hookVariableName = getHookVariableName(nodesAssociatedWithReactHookASTNode[0]);
+      break;
+  
+    case 2:
+      // const flagState = useState(true); -> later referenced as 
+      // const flag = flagState[0];
+      // const setFlag = flagState[1];
+      nodesAssociatedWithReactHookASTNode = nodesAssociatedWithReactHookASTNode
+        .filter(hookPath => filterMemberWithHookVariableName(hookPath));
+      
+      if (nodesAssociatedWithReactHookASTNode.length !== 1) {
+        // Something went wrong, only a single desirable hook should remain here
+        throw new Error('Couldn\'t isolate AST Node containing hook variable.');
+      }
+      hookVariableName = getHookVariableName(nodesAssociatedWithReactHookASTNode[0]);
+      break;
+    
+    default:
+      // Case 0:
+      // const flagState = useState(true); -> which is not accessed anywhere
+      //
+      // Case > 2 (fallback):
+      // const someState = React.useState(() => 0)
+      //
+      // const stateVariable = someState[0]
+      // const setStateVariable = someState[1]
+      //
+      // const [number2, setNumber2] = state
+      //
+      // We assign the state variable for 'someState' to multiple variables,
+      // and hence cannot isolate a unique variable name. In such cases,
+      // default to showing 'someState'
+
+      hookVariableName = getHookVariableName(potentialReactHookASTNode);
+      break;
+  }
+
+  return {...originalHook, name: `${originalHook.name}(${hookVariableName})`};
+}
+
+/**
+ * Checks whether hook is the first member of a state variable declaration
+ *
+ * @param {NodePath} hook
+ * @return {boolean}
+ */
+function filterMemberWithHookVariableName(hook: NodePath): boolean {
+    return hook.node.init.property.type === AST_NODE_TYPES.NUMERIC_LITERAL &&
+        hook.node.init.property.value === 0;
+}
+
+/**
+ * Extracts the variable name from hook node path
+ *
+ * @param {NodePath} hook The AST Node Path for the concerned hook
+ * @return {string} The variable name to be injected 
+ */
+function getHookVariableName(hook: NodePath): string {
+    const nodeType = hook.node.id.type;
+    switch (nodeType) {
+      case AST_NODE_TYPES.ARRAY_PATTERN:
+        return hook.node.id.elements[0].name;
+
+      case AST_NODE_TYPES.IDENTIFIER:
+        return hook.node.id.name;
+    
+      default:
+        console.log(hook);
+        throw new Error(`Invalid node type: ${nodeType}`);
+    }
+}
+
+
+/**
+ * Returns all the hooks with a common source URL
+ * 
+ * @param {HooksTree} hookLog The hook tree returned by the React Application 
+ * @param {string} sourceUrl Filename to compare to
+ */
+function getRelevantHooksForFile(hookLog: HooksTree, sourceUrl: string): HooksNode[] {
+  // TODO: Should we be processing flat nodes rather than nested nodes? 
+  // If so, what can be a method to recreate the hookLog given this flat nodes structure (see CustomHook case)
+  if (hookLog.length <= 0) {
+    return [];
+  }
+  const relevantHooks: HooksNode[] = [];
+  hookLog.forEach((hook) => {
+    const {hookSource, subHooks} = hook;
+    if (hookSource.fileName && hookSource.fileName === sourceUrl) {
+      relevantHooks.push(hook)
+    }
+    if (subHooks.length > 0) {
+      relevantHooks.push(...getRelevantHooksForFile(subHooks, sourceUrl))
+    }
+  })
+  return relevantHooks;
+};
+
+/**
+ * Provides the AST of the hook's source file
+ * 
+ * @param {SourceMapConsumer} consumer An object provided by the 'source-map' library to read source maps
+ * @param {number} lineNumber The line number given in the hook source
+ * @param {number} columnNumber The column number given in the hook source
+ * @param {Map<string, File>} astCache Cache of ASTs of a file with source as key
+ */
+function getASTFromSourceFile(consumer: SourceConsumer, lineNumber: number, columnNumber: number, astCache: Map<string, File>): SourceFileASTWithHookDetails {
+  // A check added to prevent parsing large files
+  const FAIL_SAFE_CHECK = 100000;
+  
+  const { line, source } = consumer.originalPositionFor({line: lineNumber, column: columnNumber});
+
+  if (line > FAIL_SAFE_CHECK) {
+    throw new Error(`Source File: ${source} is too big`)
+  }
+
+  if (astCache.has(source)) {
+    const sourceFileAST = astCache.get(source)
+    return {line, source, sourceFileAST};
+  }
+  const sourceFileContent = consumer.sourceContentFor(source, true);
+  const sourceFileAST = getASTFromSourceFileContents(sourceFileContent);
+  return {line, source, sourceFileAST};
+};
