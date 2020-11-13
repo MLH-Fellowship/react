@@ -34,6 +34,10 @@ import type {
   Element,
   InspectedElement as InspectedElementFrontend,
 } from 'react-devtools-shared/src/devtools/views/Components/types';
+import type {
+  InjectHookVariableNamesFunction,
+  HookLog,
+} from 'react-devtools-shared/src/devtools/views/DevTools';
 import type {Resource, Thenable} from '../../cache';
 
 export type StoreAsGlobal = (id: number, path: Array<string | number>) => void;
@@ -71,7 +75,7 @@ type InProgressRequest = {|
 |};
 
 const inProgressRequests: WeakMap<Element, InProgressRequest> = new WeakMap();
-const resource: Resource<
+const inspectedElementResource: Resource<
   Element,
   Element,
   InspectedElementFrontend,
@@ -95,6 +99,28 @@ const resource: Resource<
   {useWeakMap: true},
 );
 
+type NamedHooksResourceKey = [
+  Element,
+  InspectedElementFrontend,
+  InjectHookVariableNamesFunction,
+];
+
+const namedHooksResource: Resource<
+  NamedHooksResourceKey,
+  Element,
+  HookLog,
+> = createResource(
+  (key: NamedHooksResourceKey) => {
+    // eslint-disable-next-line no-unused-vars
+    const [element, inspectedElement, injectHookVariableNamesFunction] = key;
+    const {id, hooks} = inspectedElement;
+    return injectHookVariableNamesFunction(id, hooks);
+  },
+  // Key the WeakMap on the Element (in the Store) since it's stable.
+  (key: NamedHooksResourceKey) => key[0],
+  {useWeakMap: true},
+);
+
 type Props = {|
   children: React$Node,
 |};
@@ -102,7 +128,9 @@ type Props = {|
 function InspectedElementContextController({children}: Props) {
   const bridge = useContext(BridgeContext);
   const store = useContext(StoreContext);
-  const injectHookVariableNamesFunction = useContext(InjectHookVariableNamesFunctionContext).injectHookVariableNamesFunction
+  const {injectHookVariableNamesFunction} = useContext(
+    InjectHookVariableNamesFunctionContext,
+  );
   const storeAsGlobalCount = useRef(1);
 
   // Ask the backend to store the value at the specified path as a global variable.
@@ -147,7 +175,22 @@ function InspectedElementContextController({children}: Props) {
     (id: number) => {
       const element = store.getElementByID(id);
       if (element !== null) {
-        return resource.read(element);
+        const inspectedElement = inspectedElementResource.read(element);
+
+        // Mix additional hook name data into the inspected resource if we can.
+        if (
+          inspectedElement.hooks !== null &&
+          injectHookVariableNamesFunction !== null
+        ) {
+          inspectedElement.hooks = namedHooksResource.read([
+            element,
+            inspectedElement,
+            injectHookVariableNamesFunction,
+          ]);
+          inspectedElementResource.write(element, inspectedElement);
+        }
+
+        return inspectedElement;
       } else {
         return null;
       }
@@ -187,7 +230,7 @@ function InspectedElementContextController({children}: Props) {
 
               fillInPath(inspectedElement, data.value, data.path, value);
 
-              resource.write(element, inspectedElement);
+              inspectedElementResource.write(element, inspectedElement);
 
               // Schedule update with React if the currently-selected element has been invalidated.
               if (id === selectedElementID) {
@@ -255,7 +298,7 @@ function InspectedElementContextController({children}: Props) {
                     };
                   }),
             context: hydrateHelper(context),
-            hooks: injectHookVariableNamesFunction ? injectHookVariableNamesFunction(hydrateHelper(hooks)) :hydrateHelper(hooks),
+            hooks: hydrateHelper(hooks),
             props: hydrateHelper(props),
             state: hydrateHelper(state),
           };
@@ -270,7 +313,7 @@ function InspectedElementContextController({children}: Props) {
                 setCurrentlyInspectedElement(inspectedElement);
               });
             } else {
-              resource.write(element, inspectedElement);
+              inspectedElementResource.write(element, inspectedElement);
 
               // Schedule update with React if the currently-selected element has been invalidated.
               if (id === selectedElementID) {
