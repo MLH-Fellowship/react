@@ -207,7 +207,7 @@ function createPanelIfReactLoaded() {
           }
         };
 
-        function injectHookVariableNamesFunction(hookLog) {
+        function injectHookVariableNamesFunction(id, hookLog) {
           console.log('injectHookVariableNamesFunction called with', hookLog);
           // TODO : Handle subHooks case - How do we generate subHooks?
           const uniqueFilenames = hookLog.map((hook) => hook.hookSource.fileName)

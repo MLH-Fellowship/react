@@ -530,7 +530,7 @@ function buildTree(rootStack, readHookLog): HooksTree {
     // For the time being, only State and Reducer hooks support runtime overrides.
     const isStateEditable = primitive === 'Reducer' || primitive === 'State';
     const hookSource: HookSource = {lineNumber: null, functionName: null, fileName: null, columnNumber: null}
-    if (stack && stack.length === 1) {
+    if (stack && stack.length >= 1) {
       const stackFrame = stack[0]
       hookSource.lineNumber = stackFrame.lineNumber
       hookSource.functionName = stackFrame.functionName
