@@ -507,10 +507,10 @@ function buildTree(rootStack, readHookLog): HooksTree {
           value: undefined,
           subHooks: children,
           hookSource: {
-            lineNumber: stack[j-1].lineNumber,
-            columnNumber: stack[j-1].columnNumber,
-            functionName: stack[j-1].functionName,
-            fileName: stack[j-1].fileName
+            lineNumber: stack[j].lineNumber,
+            columnNumber: stack[j].columnNumber,
+            functionName: stack[j].functionName,
+            fileName: stack[j].fileName
           }
         });
         stackOfChildren.push(levelChildren);

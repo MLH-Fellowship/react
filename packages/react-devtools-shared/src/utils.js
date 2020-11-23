@@ -841,7 +841,7 @@ export function getUniqueFileNames(hookLog: HooksTree): string[] {
 }
 
 /**
- * Perform a GET request on the URL and return an object of type DownloadedFile
+ * Perform a GET request on the URL and return a promise of type DownloadedFile
  * @param {string} url
  * @returns Promisfied URL and its contents
  */
@@ -935,6 +935,9 @@ export function modifyHooksToAddVariableNames(hookLog: HooksTree, sourceMaps: Do
       // TODO: We need to recursively obtain all the hooks in the
       const relevantHooks = getRelevantHooksForFile(hookLog, sourceUrl);
       return relevantHooks.map((hook) => {
+        const {id} = hook;
+        const isCustomHook = id === null;
+
         const {lineNumber, columnNumber} = hook.hookSource;
         if (!(lineNumber && columnNumber)) {
           throw new Error(`Line and Column Numbers could not be found for hook`)
@@ -964,7 +967,13 @@ export function modifyHooksToAddVariableNames(hookLog: HooksTree, sourceMaps: Do
           .find(node => checkNodeLocation(node, line) && isConfirmedHookDeclaration(node));
 
         if (!potentialReactHookASTNode) {
-          throw new Error(`No Potential React Hook found at line ${line}`);
+          if (!isCustomHook) {
+            throw new Error(`No Potential React Hook found at line ${line}`);
+          }
+          // If the customHook is not assigned to any variable, its variable declarator AST node also cannot be found.
+          // For such cases, we inject variable names for subhooks and return the original hook
+          injectSubHooksWithVariableNames(hook, sourceMaps, sourceMapUrls, sourceFileUrls);
+          return hook;
         }
 
         // nodesAssociatedWithReactHookASTNode could directly be a used to obtain the hook variable name
@@ -973,6 +982,11 @@ export function modifyHooksToAddVariableNames(hookLog: HooksTree, sourceMaps: Do
           const nodesAssociatedWithReactHookASTNode: NodePath[] = getFilteredHookASTNodes(potentialReactHookASTNode, potentialHooksFound, source, potentialHooksOfFile);
 
           const newHook: HooksNode = getHookNodeWithInjectedVariableName(hook, nodesAssociatedWithReactHookASTNode, potentialReactHookASTNode);
+          
+          if (newHook.subHooks.length > 0) {
+          // Inject variable names recursively in sub hooks
+            injectSubHooksWithVariableNames(newHook, sourceMaps, sourceMapUrls, sourceFileUrls);
+          }
           return newHook;
 
         } catch (e) {
@@ -990,11 +1004,11 @@ export function modifyHooksToAddVariableNames(hookLog: HooksTree, sourceMaps: Do
  * Catch all identifiers that begin with "use" followed by an uppercase Latin
  * character to exclude identifiers like "user".
  * 
- * @param{string} s
+ * @param{string} name
  * @return {boolean}
  */
-function isHookName(s: string): boolean {
-  return /^use[A-Z0-9].*$/.test(s);
+function isHookName(name: string): boolean {
+  return /^use[A-Z0-9].*$/.test(name);
 }
 
 /**
@@ -1062,7 +1076,7 @@ function isConfirmedHookDeclaration(path: NodePath): boolean {
 }
 
 /**
- * Check if the line number of the source map and the hook match
+ * Check if line number obtained from source map and the line number in hook node match
  * 
  * @param {NodePath} path AST NodePath
  * @param {number} line The line number provided by source maps
@@ -1175,11 +1189,13 @@ function nodeContainsHookVariableName(hookNode: NodePath): boolean {
   //    const count = countState[0];
   //    const setCount = countState[1]; -> not obvious, hook variable can't be determined
   //                                       from the hook declaration node alone
+  // 3. For custom hooks we force pass true since we are only concerned with the AST node 
+  //    regardless of how it is accessed in source code. (See: getHookVariableName)
+
     const node = hookNode.node.id;
     if (
       (
-        node.type === AST_NODE_TYPES.ARRAY_PATTERN &&
-        isStateOrReducerHook(hookNode)
+        node.type === AST_NODE_TYPES.ARRAY_PATTERN
       ) || (
         node.type === AST_NODE_TYPES.IDENTIFIER &&
         !isStateOrReducerHook(hookNode)
@@ -1209,13 +1225,16 @@ function getFilteredHookASTNodes(potentialReactHookASTNode: NodePath, potentialH
   }
 
   let nodesAssociatedWithReactHookASTNode: NodePath[] = [];
-  if (nodeContainsHookVariableName(potentialReactHookASTNode)) {
+  if (nodeContainsHookVariableName(potentialReactHookASTNode)) { // made custom hooks to enter this, always
     // Case 1.
     // Directly usable Node -> const ref = useRef(null);
     //                      -> const [tick, setTick] = useState(1);
+    // Case 2.
+    // Custom Hooks -> const someVariable = useSomeCustomHook();
+    //              -> const [someVariable, someFunction] = useAnotherCustomHook();
     nodesAssociatedWithReactHookASTNode.unshift(potentialReactHookASTNode);
   } else {
-    // Case 2.
+    // Case 3.
     // Indirectly usable Node -> const tickState = useState(1);
     //                           [tick, setTick] = tickState;
     //                        -> const tickState = useState(1);
@@ -1250,6 +1269,7 @@ function filterMemberNodesOfTargetHook(targetHookNode: NodePath, hookNode: NodeP
  */
 function getHookNodeWithInjectedVariableName(originalHook: HooksNode, nodesAssociatedWithReactHookASTNode: NodePath[], potentialReactHookASTNode: NodePath): HooksNode {
   let hookVariableName: string | null;
+  const isCustomHook = originalHook.id === null;
 
   switch (nodesAssociatedWithReactHookASTNode.length) {
     case 1:
@@ -1258,8 +1278,19 @@ function getHookNodeWithInjectedVariableName(originalHook: HooksNode, nodesAssoc
       // const [flag, setFlag] = flagState;
       //
       // CASE 1B (nodesAssociatedWithReactHookASTNode[0] === potentialReactHookASTNode):
-      // const [flag, setFlag] = useState(true); -> we have access to the hook variable
-      //                                            straight away
+      // const [flag, setFlag] = useState(true); -> we have access to the hook variable straight away
+      //
+      // CASE 1C (isCustomHook && nodesAssociatedWithReactHookASTNode[0] === potentialReactHookASTNode):
+      // const someVariable = useSomeCustomHook(); -> we have access to hook variable straight away
+      // const [someVariable, someFunction] = useAnotherCustomHook(); -> we ignore variable names in this case
+      //                                                                 as it is unclear what variable name to show
+      if (
+        isCustomHook &&
+        (nodesAssociatedWithReactHookASTNode[0] === potentialReactHookASTNode)
+      ) {
+        hookVariableName = getHookVariableName(potentialReactHookASTNode, isCustomHook);
+        break;
+      }
       hookVariableName = getHookVariableName(nodesAssociatedWithReactHookASTNode[0]);
       break;
   
@@ -1301,9 +1332,26 @@ function getHookNodeWithInjectedVariableName(originalHook: HooksNode, nodesAssoc
 }
 
 /**
- * Checks whether hook is the first member of a state variable declaration
+ * Calls modifyHooksToAddVariableNames for sub hooks of the hook node passed as argument and injects variable names in sub hook nodes
  *
- * @param {NodePath} hook
+ * @param {HooksTree} hook
+ * @param {DownloadedFile[]} sourceMaps
+ * @param {FileMappings} sourceMapUrls
+ * @param {FileMappings} sourceFileUrls
+ */
+function injectSubHooksWithVariableNames(hook: HooksTree, sourceMaps: DownloadedFile[], sourceMapUrls: FileMappings, sourceFileUrls: FileMappings): void {
+  modifyHooksToAddVariableNames(hook.subHooks, sourceMaps, sourceMapUrls, sourceFileUrls)
+    .then((subHooksLog: HooksTree) => {
+      const modifiedSubHooks: HooksNode[] = [];
+      subHooksLog.forEach(subHook => modifiedSubHooks.push(...subHook));
+      hook.subHooks = modifiedSubHooks;
+    })
+}
+
+/**
+ * Checks whether hook is the first member node of a state variable declaration node
+ *
+ * @param {NodePath} hook The AST Node Path for the concerned hook
  * @return {boolean}
  */
 function filterMemberWithHookVariableName(hook: NodePath): boolean {
@@ -1317,17 +1365,16 @@ function filterMemberWithHookVariableName(hook: NodePath): boolean {
  * @param {NodePath} hook The AST Node Path for the concerned hook
  * @return {string} The variable name to be injected 
  */
-function getHookVariableName(hook: NodePath): string {
+function getHookVariableName(hook: NodePath, isCustomHook: boolean = false): string {
     const nodeType = hook.node.id.type;
     switch (nodeType) {
       case AST_NODE_TYPES.ARRAY_PATTERN:
-        return hook.node.id.elements[0].name;
+        return !isCustomHook ? hook.node.id.elements[0].name : '';
 
       case AST_NODE_TYPES.IDENTIFIER:
         return hook.node.id.name;
     
       default:
-        console.log(hook);
         throw new Error(`Invalid node type: ${nodeType}`);
     }
 }
@@ -1347,12 +1394,9 @@ function getRelevantHooksForFile(hookLog: HooksTree, sourceUrl: string): HooksNo
   }
   const relevantHooks: HooksNode[] = [];
   hookLog.forEach((hook) => {
-    const {hookSource, subHooks} = hook;
+    const {hookSource} = hook;
     if (hookSource.fileName && hookSource.fileName === sourceUrl) {
       relevantHooks.push(hook)
-    }
-    if (subHooks.length > 0) {
-      relevantHooks.push(...getRelevantHooksForFile(subHooks, sourceUrl))
     }
   })
   return relevantHooks;

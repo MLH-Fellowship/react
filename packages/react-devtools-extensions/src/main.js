@@ -225,7 +225,9 @@ function createPanelIfReactLoaded() {
               sourceFileURLs.set(sourceMapURL, url);
             });
             
-            return Promise.all(Array.from(sourceMapURLs.values()).map(fetchFile));
+            return Promise.all(
+              Array.from(sourceMapURLs.values()).map(fetchFile)
+            );
           })
           .then((sourceMaps) => modifyHooksToAddVariableNames(
               hookLog, sourceMaps, sourceMapURLs, sourceFileURLs
