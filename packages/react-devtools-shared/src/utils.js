@@ -967,12 +967,17 @@ export function modifyHooksToAddVariableNames(hookLog: HooksTree, sourceMaps: Do
           .find(node => checkNodeLocation(node, line) && isConfirmedHookDeclaration(node));
 
         if (!potentialReactHookASTNode) {
-          if (!isCustomHook) {
+          // Custom hooks and primitive hooks that aren't assigned any variables, don't have any corresponding AST nodes
+          if (!isCustomHook && !isNonDeclarativePrimitiveHook(hook)) {
             throw new Error(`No Potential React Hook found at line ${line}`);
           }
-          // If the customHook is not assigned to any variable, its variable declarator AST node also cannot be found.
-          // For such cases, we inject variable names for subhooks and return the original hook
-          injectSubHooksWithVariableNames(hook, sourceMaps, sourceMapUrls, sourceFileUrls);
+          if (isCustomHook) {
+            // If the customHook is not assigned to any variable, its variable declarator AST node also cannot be found.
+            // For such cases, we inject variable names for subhooks.
+            injectSubHooksWithVariableNames(hook, sourceMaps, sourceMapUrls, sourceFileUrls);
+          }
+          // Return original hook object for primitive and custom hooks that are not assigned to any variables.
+          // eg. useEffect, useLayoutEffect etc.
           return hook;
         }
 
@@ -1174,6 +1179,16 @@ function isPotentialHookDeclaration(path: NodePath): boolean {
 }
 
 /**
+ * Determines whether incoming hook is a primitive hook that gets assigned to variables.
+ *
+ * @param {HooksNode} hook - Original hook object
+ * @return {boolean} - Returns true for primitive hooks that are not assigned to variables.
+ */
+function isNonDeclarativePrimitiveHook(hook: HooksNode) {
+  return ['Effect', 'ImperativeHandle', 'LayoutEffect', 'DebugValue'].includes(hook.name);
+}
+
+/**
  * Check whether hookNode of a declaration contains obvious variable name
  * 
  * @param {NodePath} hookNode 
@@ -1328,7 +1343,7 @@ function getHookNodeWithInjectedVariableName(originalHook: HooksNode, nodesAssoc
       break;
   }
 
-  return {...originalHook, name: `${originalHook.name}(${hookVariableName})`};
+  return {...originalHook, hookVariableName};
 }
 
 /**

@@ -48,6 +48,7 @@ type KeyValueProps = {|
   pathRoot: Type,
   store: Store,
   value: any,
+  hookVariableName: string
 |};
 
 export default function KeyValue({
@@ -68,6 +69,7 @@ export default function KeyValue({
   pathRoot,
   store,
   value,
+  hookVariableName
 }: KeyValueProps) {
   const {id} = inspectedElement;
 
@@ -187,26 +189,29 @@ export default function KeyValue({
   }
 
   let renderedName;
+
+  const fetchedName = hookVariableName ? `${name}(${hookVariableName})`: name;
+
   if (isDirectChildOfAnArray) {
     if (canDeletePaths) {
       renderedName = (
-        <DeleteToggle name={name} deletePath={deletePath} path={path} />
+        <DeleteToggle name={fetchedName} deletePath={deletePath} path={path} />
       );
     } else {
-      renderedName = <span className={styles.Name}>{name}</span>;
+      renderedName = <span className={styles.Name}>{fetchedName}</span>;
     }
   } else if (canRenameTheCurrentPath) {
     renderedName = (
       <EditableName
         allowEmpty={canDeletePaths}
         className={styles.EditableName}
-        initialValue={name}
+        initialValue={fetchedName}
         overrideName={renamePath}
         path={path}
       />
     );
   } else {
-    renderedName = <span className={styles.Name}>{name}</span>;
+    renderedName = <span className={styles.Name}>{fetchedName}</span>;
   }
 
   let children = null;

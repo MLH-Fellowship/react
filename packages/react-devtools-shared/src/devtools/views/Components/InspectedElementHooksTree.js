@@ -114,7 +114,7 @@ function HookView({
     canEditHooksAndDeletePaths,
     canEditHooksAndRenamePaths,
   } = inspectedElement;
-  const {name, id: hookID, isStateEditable, subHooks, value} = hook;
+  const {name, id: hookID, isStateEditable, subHooks, value, hookVariableName} = hook;
 
   const isReadOnly = hookID == null || !isStateEditable;
 
@@ -218,6 +218,7 @@ function HookView({
         store={store}
         type="hooks"
         value={subHooks}
+        hookVariableName={hookVariableName}
       />
     );
 
@@ -252,6 +253,7 @@ function HookView({
               pathRoot="hooks"
               store={store}
               value={value}
+              hookVariableName={hookVariableName}
             />
             {subHooksView}
           </div>
@@ -298,6 +300,7 @@ function HookView({
             pathRoot="hooks"
             store={store}
             value={value}
+            hookVariableName={hookVariableName}
           />
         </div>
       );
@@ -319,6 +322,7 @@ function HookView({
             pathRoot="hooks"
             store={store}
             value={value}
+            hookVariableName={hookVariableName}
           />
         </div>
       );
