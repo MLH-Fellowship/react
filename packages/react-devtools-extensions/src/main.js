@@ -210,7 +210,7 @@ function createPanelIfReactLoaded() {
           console.log('injectHookVariableNamesFunction called with', hookLog);
           const uniqueFilenames = getUniqueFileNames(hookLog);
           
-          // For O(1) lookup of both sourceMapURLs and url given one of these - these are to reinitialised to maps
+          // To create a one-to-one mapping b/w source map URLs and source file URLs.
           const sourceMapURLs = new Map();
           const sourceFileURLs = new Map();
           // Obtain source content of all the unique files
@@ -234,8 +234,8 @@ function createPanelIfReactLoaded() {
             ))
           .then(data => {
             const newHookLog = []
-            data.forEach((file) => {
-              newHookLog.push(...file)
+            data.forEach((hooksOfBundledFile) => {
+              newHookLog.push(...hooksOfBundledFile)
             })
             return newHookLog
           })

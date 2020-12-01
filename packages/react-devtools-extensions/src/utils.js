@@ -1,5 +1,4 @@
 /* global chrome */
-// import { NodePath } from "@babel/core";
 
 const IS_CHROME = navigator.userAgent.indexOf('Firefox') < 0;
 
