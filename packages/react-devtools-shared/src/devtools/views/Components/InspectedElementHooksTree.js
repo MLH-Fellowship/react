@@ -172,6 +172,7 @@ function HookView({
 
   let displayValue;
   let isComplexDisplayValue = false;
+  const customHookDisplayName = hookVariableName ? `${name}(${hookVariableName})` : name;
 
   // Format data for display to mimic the props/state/context for now.
   if (type === 'string') {
@@ -230,7 +231,7 @@ function HookView({
             <span
               onClick={toggleIsOpen}
               className={name !== '' ? styles.Name : styles.NameAnonymous}>
-              {name || 'Anonymous'}
+              {customHookDisplayName || 'Anonymous'}
             </span>
             <span className={styles.Value} onClick={toggleIsOpen}>
               {isOpen || getMetaValueLabel(value)}
@@ -267,7 +268,7 @@ function HookView({
             <span
               onClick={toggleIsOpen}
               className={name !== '' ? styles.Name : styles.NameAnonymous}>
-              {name || 'Anonymous'}
+              {customHookDisplayName || 'Anonymous'}
             </span>{' '}
             {/* $FlowFixMe */}
             <span className={styles.Value} onClick={toggleIsOpen}>
