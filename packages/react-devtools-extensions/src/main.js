@@ -240,7 +240,9 @@ function createPanelIfReactLoaded() {
             return newHookLog
           })
           .catch(e => {
-            console.warn(e);
+            if (__DEV__) {
+              console.warn(e);
+            }
             return Promise.resolve(hookLog);
           });
         }

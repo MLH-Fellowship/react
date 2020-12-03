@@ -11,7 +11,7 @@ const {getGitCommit} = require('./utils');
 
 // These files are copied along with Webpack-bundled files
 // to produce the final web extension
-const STATIC_FILES = ['icons', 'popups', 'main.html', 'panel.html'];
+const STATIC_FILES = ['icons', 'popups', 'main.html', 'panel.html', 'mappings.wasm'];
 
 const preProcess = async (destinationPath, tempPath) => {
   await remove(destinationPath); // Clean up from previously completed builds

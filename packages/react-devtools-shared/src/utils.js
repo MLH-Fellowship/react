@@ -905,7 +905,8 @@ export function getSourceMapURL(url: string, urlResponse: string): string {
  * TODO: Bundle WASM in extension static files and use those instead of versioned URLs
  */
 function initialiseSourceMaps() {
-  const wasmMappingsURL = 'https://unpkg.com/source-map@0.7.3/lib/mappings.wasm';
+  const wasmFileName = 'mappings.wasm'
+  const wasmMappingsURL = chrome.extension.getURL(wasmFileName);
   SourceMapConsumer.initialize({ 'lib/mappings.wasm': wasmMappingsURL });
 }
 

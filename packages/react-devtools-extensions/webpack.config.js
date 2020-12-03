@@ -35,6 +35,7 @@ module.exports = {
   node: {
     // Don't define a polyfill on window.setImmediate
     setImmediate: false,
+    fs: 'empty',
   },
   resolve: {
     alias: {
