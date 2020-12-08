@@ -1444,3 +1444,20 @@ function getASTFromSourceFile(consumer: SourceConsumer, lineNumber: number, colu
   const sourceFileAST = getASTFromSourceFileContents(sourceFileContent);
   return {line, source, sourceFileAST};
 };
+
+/**
+ * Shallow merge the names of the variables with the old hook log
+ * @param {HooksTree} oldHookLog Hooklog without the variable names
+ * @param {HooksTree} newHookLog Hooklog with variable names
+ */
+export function mergeVariableNamesIntoHookLog(oldHookLog: HooksTree, newHookLog: HooksTree): void {
+  oldHookLog.forEach((hook, idx) => {
+    const modifiedHookFromNewHookLog = newHookLog[idx];
+    if (hook.id === modifiedHookFromNewHookLog.id) {
+      hook.hookVariableName = modifiedHookFromNewHookLog.hookVariableName;
+      if (hook.subHooks.length > 0 && hook.subHooks.length === modifiedHookFromNewHookLog.subHooks.length) {
+        mergeVariableNamesIntoHookLog(hook.subHooks, modifiedHookFromNewHookLog.subHooks)
+      }
+    }
+  })
+};

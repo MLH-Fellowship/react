@@ -23,7 +23,7 @@ import {BridgeContext, StoreContext} from '../context';
 import {hydrate, fillInPath} from 'react-devtools-shared/src/hydration';
 import {TreeStateContext} from './TreeContext';
 import InjectHookVariableNamesFunctionContext from './InjectHookVariableNamesFunctionContext';
-import {separateDisplayNameAndHOCs} from 'react-devtools-shared/src/utils';
+import {separateDisplayNameAndHOCs, mergeVariableNamesIntoHookLog} from 'react-devtools-shared/src/utils';
 
 import type {
   InspectedElement as InspectedElementBackend,
@@ -182,12 +182,12 @@ function InspectedElementContextController({children}: Props) {
           inspectedElement.hooks !== null &&
           injectHookVariableNamesFunction !== null
         ) {
-          inspectedElement.hooks = namedHooksResource.read([
+          const newHooks = namedHooksResource.read([
             element,
             inspectedElement,
             injectHookVariableNamesFunction,
           ]);
-          namedHooksResource.invalidate(element);
+          mergeVariableNamesIntoHookLog(inspectedElement.hooks, newHooks);
           inspectedElementResource.write(element, inspectedElement);
         }
 
