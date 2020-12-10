@@ -821,7 +821,7 @@ const AST_NODE_TYPES = Object.freeze({
  * @param {HooksTree} hookLog The hook tree returned by the React Application 
  * @returns {string[]} Filenames
  */
-export function getUniqueFileNames(hookLog: HooksTree): string[] {
+function getUniqueFileNames(hookLog: HooksTree): string[] {
   if (hookLog.length <= 0) {
     return []
   }
@@ -845,7 +845,7 @@ export function getUniqueFileNames(hookLog: HooksTree): string[] {
  * @param {string} url
  * @returns Promisfied URL and its contents
  */
-export function fetchFile(url: string): Promise<DownloadedFile> {
+function fetchFile(url: string): Promise<DownloadedFile> {
   return new Promise((resolve, reject) => {
     fetch(url).then((res) => {
       if (res.ok) {
@@ -883,7 +883,7 @@ function isValidUrl(possibleURL: string): boolean {
  * @param {string} url 
  * @param {string} urlResponse 
  */
-export function getSourceMapURL(url: string, urlResponse: string): string {
+function getSourceMapURL(url: string, urlResponse: string): string {
   const sourceMappingUrlRegExp = /\/\/[#@] ?sourceMappingURL=([^\s'"]+)\s*$/mg
   const sourceMappingURLInArray = urlResponse.match(sourceMappingUrlRegExp);
   if (sourceMappingURLInArray && sourceMappingURLInArray.length > 1) {
@@ -915,7 +915,7 @@ function initialiseSourceMaps() {
  * @param {HookTree} hookLog The hook tree returned by the React Application 
  * @param {*} sourceMaps SourceMaps of all the files referenced in the hookLog
  */
-export function modifyHooksToAddVariableNames(hookLog: HooksTree, sourceMaps: DownloadedFile[], sourceMapUrls: FileMappings, sourceFileUrls: FileMappings): Promise<HooksTree> {
+function modifyHooksToAddVariableNames(hookLog: HooksTree, sourceMaps: DownloadedFile[], sourceMapUrls: FileMappings, sourceFileUrls: FileMappings): Promise<HooksTree> {
   initialiseSourceMaps()
 
   // For each sourceMapFile, we can now obtain the 
@@ -1461,3 +1461,44 @@ export function mergeVariableNamesIntoHookLog(oldHookLog: HooksTree, newHookLog:
     }
   })
 };
+
+export function injectHookVariableNamesFunction(hookLog: HooksTree): Promise<HooksTree> {
+  console.log('injectHookVariableNamesFunction called with', hookLog);
+  const uniqueFilenames = getUniqueFileNames(hookLog);
+  
+  // To create a one-to-one mapping b/w source map URLs and source file URLs.
+  const sourceMapURLs = new Map();
+  const sourceFileURLs = new Map();
+  // Obtain source content of all the unique files
+  return Promise.all(
+    uniqueFilenames.map((fileName) => fetchFile(fileName))
+  )
+  .then((downloadedFiles) => {
+    downloadedFiles.forEach((file) => {
+      const {url, text} = file.data;
+      const sourceMapURL = getSourceMapURL(url, text);
+      sourceMapURLs.set(url, sourceMapURL);
+      sourceFileURLs.set(sourceMapURL, url);
+    });
+    
+    return Promise.all(
+      Array.from(sourceMapURLs.values()).map(fetchFile)
+    );
+  })
+  .then((sourceMaps) => modifyHooksToAddVariableNames(
+      hookLog, sourceMaps, sourceMapURLs, sourceFileURLs
+    ))
+  .then(data => {
+    const newHookLog = []
+    data.forEach((hooksOfBundledFile) => {
+      newHookLog.push(...hooksOfBundledFile)
+    })
+    return newHookLog
+  })
+  .catch(e => {
+    if (__DEV__) {
+      console.warn(e);
+    }
+    return Promise.resolve(hookLog);
+  });
+}

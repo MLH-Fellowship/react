@@ -53,7 +53,6 @@ export type ViewElementSource = (
   inspectedElement: InspectedElement,
 ) => void;
 export type InjectHookVariableNamesFunction = (
-  id: number,
   hookLog: HookLog,
 ) => Thenable<HookLog>;
 export type ViewAttributeSource = (

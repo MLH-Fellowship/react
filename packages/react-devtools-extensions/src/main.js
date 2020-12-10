@@ -10,10 +10,7 @@ import {
   getAppendComponentStack,
   getBreakOnConsoleErrors,
   getSavedComponentFilters,
-  getUniqueFileNames,
-  fetchFile,
-  getSourceMapURL,
-  modifyHooksToAddVariableNames
+  injectHookVariableNamesFunction
 } from 'react-devtools-shared/src/utils';
 import {
   localStorageGetItem,
@@ -205,47 +202,6 @@ function createPanelIfReactLoaded() {
             }, 100);
           }
         };
-
-        function injectHookVariableNamesFunction(id, hookLog) {
-          console.log('injectHookVariableNamesFunction called with', hookLog);
-          const uniqueFilenames = getUniqueFileNames(hookLog);
-          
-          // To create a one-to-one mapping b/w source map URLs and source file URLs.
-          const sourceMapURLs = new Map();
-          const sourceFileURLs = new Map();
-          // Obtain source content of all the unique files
-          return Promise.all(
-            uniqueFilenames.map((fileName) => fetchFile(fileName))
-          )
-          .then((downloadedFiles) => {
-            downloadedFiles.forEach((file) => {
-              const {url, text} = file.data;
-              const sourceMapURL = getSourceMapURL(url, text);
-              sourceMapURLs.set(url, sourceMapURL);
-              sourceFileURLs.set(sourceMapURL, url);
-            });
-            
-            return Promise.all(
-              Array.from(sourceMapURLs.values()).map(fetchFile)
-            );
-          })
-          .then((sourceMaps) => modifyHooksToAddVariableNames(
-              hookLog, sourceMaps, sourceMapURLs, sourceFileURLs
-            ))
-          .then(data => {
-            const newHookLog = []
-            data.forEach((hooksOfBundledFile) => {
-              newHookLog.push(...hooksOfBundledFile)
-            })
-            return newHookLog
-          })
-          .catch(e => {
-            if (__DEV__) {
-              console.warn(e);
-            }
-            return Promise.resolve(hookLog);
-          });
-        }
 
         root = createRoot(document.createElement('div'));
 

@@ -25,9 +25,11 @@ describe('InspectedElementContext', () => {
   let store: Store;
   let meta;
   let utils;
+  let injectHookVariableNames;
 
   let BridgeContext;
   let InspectedElementContext;
+  let InjectHookVariableNamesFunctionContext;
   let InspectedElementContextController;
   let StoreContext;
   let TestUtils;
@@ -64,6 +66,7 @@ describe('InspectedElementContext', () => {
       .StoreContext;
     TreeContextController = require('react-devtools-shared/src/devtools/views/Components/TreeContext')
       .TreeContextController;
+    InjectHookVariableNamesFunctionContext = require('react-devtools-shared/src/devtools/views/Components/InjectHookVariableNamesFunctionContext')
   });
 
   const Contexts = ({
@@ -73,13 +76,15 @@ describe('InspectedElementContext', () => {
   }) => (
     <BridgeContext.Provider value={bridge}>
       <StoreContext.Provider value={store}>
-        <TreeContextController
-          defaultSelectedElementID={defaultSelectedElementID}
-          defaultSelectedElementIndex={defaultSelectedElementIndex}>
-          <InspectedElementContextController>
-            {children}
-          </InspectedElementContextController>
-        </TreeContextController>
+        <InjectHookVariableNamesFunctionContext.Provider value={injectHookVariableNames}>
+          <TreeContextController
+            defaultSelectedElementID={defaultSelectedElementID}
+            defaultSelectedElementIndex={defaultSelectedElementIndex}>
+            <InspectedElementContextController>
+              {children}
+            </InspectedElementContextController>
+          </TreeContextController>
+        </InjectHookVariableNamesFunctionContext.Provider>
       </StoreContext.Provider>
     </BridgeContext.Provider>
   );

@@ -113,8 +113,8 @@ const namedHooksResource: Resource<
   (key: NamedHooksResourceKey) => {
     // eslint-disable-next-line no-unused-vars
     const [element, inspectedElement, injectHookVariableNamesFunction] = key;
-    const {id, hooks} = inspectedElement;
-    return injectHookVariableNamesFunction(id, hooks);
+    const {hooks} = inspectedElement;
+    return injectHookVariableNamesFunction(hooks);
   },
   // Key the WeakMap on the Element (in the Store) since it's stable.
   (key: NamedHooksResourceKey) => key[0],
