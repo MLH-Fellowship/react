@@ -66,7 +66,7 @@ describe('InspectedElementContext', () => {
       .StoreContext;
     TreeContextController = require('react-devtools-shared/src/devtools/views/Components/TreeContext')
       .TreeContextController;
-    InjectHookVariableNamesFunctionContext = require('react-devtools-shared/src/devtools/views/Components/InjectHookVariableNamesFunctionContext')
+    InjectHookVariableNamesFunctionContext = require('react-devtools-shared/src/devtools/views/Components/InjectHookVariableNamesFunctionContext').default;
   });
 
   const Contexts = ({
