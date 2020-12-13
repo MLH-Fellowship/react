@@ -975,7 +975,7 @@ function modifyHooksToAddVariableNames(hookLog: HooksTree, sourceMaps: Downloade
           return hook;
         }
 
-        // nodesAssociatedWithReactHookASTNode could directly be a used to obtain the hook variable name
+        // nodesAssociatedWithReactHookASTNode could directly be used to obtain the hook variable name
         // depending on the type of potentialReactHookASTNode
         try {
           const nodesAssociatedWithReactHookASTNode: NodePath[] = getFilteredHookASTNodes(potentialReactHookASTNode, potentialHooksFound, source, potentialHooksOfFile);
@@ -1065,7 +1065,7 @@ function getASTFromSourceFileContents(fileContents: string) {
  * @param {NodePath} path
  * @return {boolean}
  */
-function isConfirmedHookDeclaration(path: NodePath): boolean {
+export function isConfirmedHookDeclaration(path: NodePath): boolean {
   const node = path.node.init;
   if (node.type !== AST_NODE_TYPES.CALL_EXPRESSION) {
     return false;
@@ -1080,7 +1080,7 @@ function isConfirmedHookDeclaration(path: NodePath): boolean {
  * @param {NodePath} path AST NodePath
  * @param {number} line The line number provided by source maps
  */
-function checkNodeLocation(path: NodePath, line: number): boolean {
+export function checkNodeLocation(path: NodePath, line: number): boolean {
   const locationOfNode = path.node.loc;
   return (line === locationOfNode.start.line);
 }
@@ -1101,7 +1101,7 @@ function isStateOrReducerHook(path: NodePath): boolean {
  * @param {File} sourceAST
  * @return {NodePath[]}
  */
-function getPotentialHookDeclarationsFromAST(sourceAST: File): NodePath[] {
+export function getPotentialHookDeclarationsFromAST(sourceAST: File): NodePath[] {
   const potentialHooksFound: NodePath[] = [];
   traverse(sourceAST, {
     enter(path) {
@@ -1205,7 +1205,7 @@ function nodeContainsHookVariableName(hookNode: NodePath): boolean {
  * @param {Map<string, Array<NodePath>>} potentialHooksOfFile
  * @return {NodePath[]}  nodesAssociatedWithReactHookASTNode
  */
-function getFilteredHookASTNodes(potentialReactHookASTNode: NodePath, potentialHooksFound: NodePath[], source: string, potentialHooksOfFile: Map<string, Array<NodePath>>): NodePath[] {
+export function getFilteredHookASTNodes(potentialReactHookASTNode: NodePath, potentialHooksFound: NodePath[], source: string, potentialHooksOfFile: Map<string, Array<NodePath>>): NodePath[] {
   // Remove targetHook from potentialHooks array since its purpose is served. 
   // Also to clean the potentialHooks array for further filtering member nodes down the line.
   const hookIdx = potentialHooksFound.indexOf(potentialReactHookASTNode);
@@ -1355,7 +1355,7 @@ function filterMemberWithHookVariableName(hook: NodePath): boolean {
  * @param {NodePath} hook The AST Node Path for the concerned hook
  * @return {string} The variable name to be injected 
  */
-function getHookVariableName(hook: NodePath, isCustomHook: boolean = false): string {
+export function getHookVariableName(hook: NodePath, isCustomHook: boolean = false): string {
     const nodeType = hook.node.id.type;
     switch (nodeType) {
       case AST_NODE_TYPES.ARRAY_PATTERN:
