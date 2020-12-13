@@ -1,5 +1,24 @@
+function serializeHookSourceFileNames(hooks) {
+  if (!hooks.length) return
+  hooks.forEach(hook => {
+    if (!hook.hookSource) return
+    const filename = hook.hookSource.fileName
+    const truncateIdx = filename.lastIndexOf('/react-devtools-shared/')
+    hook.hookSource.fileName = filename.substring(truncateIdx + 1)
+    if (hook.subHooks && hook.subHooks.length)
+      serializeHookSourceFileNames(hook.subHooks)
+  })
+}
+
 // test() is part of Jest's serializer API
 export function test(maybeInspectedElement) {
+  if (
+    maybeInspectedElement !== null &&
+    typeof maybeInspectedElement === 'object' &&
+    maybeInspectedElement.hasOwnProperty('hooks') &&
+    maybeInspectedElement.hooks != null
+  )
+    serializeHookSourceFileNames(maybeInspectedElement.hooks)
   return (
     maybeInspectedElement !== null &&
     typeof maybeInspectedElement === 'object' &&

@@ -25,7 +25,6 @@ describe('InspectedElementContext', () => {
   let store: Store;
   let meta;
   let utils;
-  let injectHookVariableNames;
 
   let BridgeContext;
   let InspectedElementContext;
@@ -76,7 +75,7 @@ describe('InspectedElementContext', () => {
   }) => (
     <BridgeContext.Provider value={bridge}>
       <StoreContext.Provider value={store}>
-        <InjectHookVariableNamesFunctionContext.Provider value={injectHookVariableNames}>
+        <InjectHookVariableNamesFunctionContext.Provider value={{injectHookVariableNamesFunction:null}}>
           <TreeContextController
             defaultSelectedElementID={defaultSelectedElementID}
             defaultSelectedElementIndex={defaultSelectedElementIndex}>

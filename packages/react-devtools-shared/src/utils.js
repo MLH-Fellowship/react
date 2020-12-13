@@ -901,9 +901,6 @@ function getSourceMapURL(url: string, urlResponse: string): string {
 };
 
 
-/**
- * TODO: Bundle WASM in extension static files and use those instead of versioned URLs
- */
 function initialiseSourceMaps() {
   const wasmFileName = 'mappings.wasm'
   const wasmMappingsURL = chrome.extension.getURL(wasmFileName);
@@ -952,11 +949,7 @@ function modifyHooksToAddVariableNames(hookLog: HooksTree, sourceMaps: Downloade
 
           // TODO: handle mismatch in number of hooks (conditional hook case?) - Cannot check relevantHooks.length count to match
           // as relevantHooks point to hooks for min file 'main.chunk.js' while hookDeclarationCount points to hooks of source file 'App.js'
-          // const hookDeclarationsCount = getHookDeclarationsCountInFile(potentialHooksFound);
-          // if (relevantHooks.length !== hookDeclarationsCount) {
-          //   // throw error, escape the promise chain
-          //   throw new Error('Hooks found in source do not match hooks found in component');
-          // }
+
           // hash potentialHooks array for current source to prevent parsing in following iterations
           potentialHooksOfFile.set(source, potentialHooksFound);
         }
@@ -1102,25 +1095,6 @@ function isStateOrReducerHook(path: NodePath): boolean {
   const callee = path.node.init.callee;
   return isReactFunction(callee, 'useState') ||
     isReactFunction(callee, 'useReducer');
-}
-
-/**
- * Used to calculate the possible number of hooks in a File
- * 
- * @param {NodePath[]} potentialHooks AST nodes that COULD be React Hooks
- * @return {number}
- */
-function getHookDeclarationsCountInFile(potentialHooks: NodePath[]): number {
-  let hookDeclarationsCount = 0;
-  potentialHooks.forEach(path => {
-    if (
-      path.node.init.type === AST_NODE_TYPES.CALL_EXPRESSION &&
-      isHook(path.node.init.callee)
-    ) {
-      hookDeclarationsCount += 1;
-    }
-  });
-  return hookDeclarationsCount;
 }
 
 /**
@@ -1271,7 +1245,7 @@ function getFilteredHookASTNodes(potentialReactHookASTNode: NodePath, potentialH
  */
 function filterMemberNodesOfTargetHook(targetHookNode: NodePath, hookNode: NodePath): boolean {
     const targetHookName = targetHookNode.node.id.name;
-    return targetHookName === hookNode.node.init.object?.name ||
+    return targetHookName === (hookNode.node.init.object && hookNode.node.init.object.name) ||
         targetHookName === hookNode.node.init.name;
 }
 
@@ -1403,8 +1377,6 @@ function getHookVariableName(hook: NodePath, isCustomHook: boolean = false): str
  * @param {string} sourceUrl Filename to compare to
  */
 function getRelevantHooksForFile(hookLog: HooksTree, sourceUrl: string): HooksNode[] {
-  // TODO: Should we be processing flat nodes rather than nested nodes? 
-  // If so, what can be a method to recreate the hookLog given this flat nodes structure (see CustomHook case)
   if (hookLog.length <= 0) {
     return [];
   }

@@ -55,9 +55,21 @@ exports[`InspectedElementContext should display complex values of useDebugValue:
           "isStateEditable": true,
           "name": "State",
           "value": 1,
-          "subHooks": []
+          "subHooks": [],
+          "hookSource": {
+            "lineNumber": 1777,
+            "functionName": "useDebuggableHook",
+            "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js",
+            "columnNumber": 15
+          }
         }
-      ]
+      ],
+      "hookSource": {
+        "lineNumber": 1781,
+        "columnNumber": 9,
+        "functionName": "DisplayedComplexValue",
+        "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js"
+      }
     }
   ],
   "props": {},
@@ -167,7 +179,13 @@ exports[`InspectedElementContext should inspect hooks for components that only u
       "isStateEditable": false,
       "name": "Context",
       "value": true,
-      "subHooks": []
+      "subHooks": [],
+      "hookSource": {
+        "lineNumber": 1490,
+        "functionName": "Example",
+        "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js",
+        "columnNumber": 27
+      }
     }
   ],
   "props": {
@@ -189,7 +207,13 @@ exports[`InspectedElementContext should inspect the currently selected element: 
       "isStateEditable": true,
       "name": "State",
       "value": 1,
-      "subHooks": []
+      "subHooks": [],
+      "hookSource": {
+        "lineNumber": 93,
+        "functionName": "Example",
+        "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js",
+        "columnNumber": 15
+      }
     }
   ],
   "props": {
@@ -226,7 +250,13 @@ exports[`InspectedElementContext should not dehydrate nested values until explic
       "value": {
         "foo": {}
       },
-      "subHooks": []
+      "subHooks": [],
+      "hookSource": {
+        "lineNumber": 1111,
+        "functionName": "Example",
+        "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js",
+        "columnNumber": 15
+      }
     }
   ],
   "props": {
@@ -251,7 +281,13 @@ exports[`InspectedElementContext should not dehydrate nested values until explic
       "value": {
         "foo": {}
       },
-      "subHooks": []
+      "subHooks": [],
+      "hookSource": {
+        "lineNumber": 1111,
+        "functionName": "Example",
+        "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js",
+        "columnNumber": 15
+      }
     }
   ],
   "props": {
@@ -280,7 +316,13 @@ exports[`InspectedElementContext should not dehydrate nested values until explic
       "value": {
         "foo": {}
       },
-      "subHooks": []
+      "subHooks": [],
+      "hookSource": {
+        "lineNumber": 1111,
+        "functionName": "Example",
+        "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js",
+        "columnNumber": 15
+      }
     }
   ],
   "props": {
@@ -313,7 +355,13 @@ exports[`InspectedElementContext should not dehydrate nested values until explic
       "value": {
         "foo": {}
       },
-      "subHooks": []
+      "subHooks": [],
+      "hookSource": {
+        "lineNumber": 1111,
+        "functionName": "Example",
+        "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js",
+        "columnNumber": 15
+      }
     }
   ],
   "props": {
@@ -350,7 +398,13 @@ exports[`InspectedElementContext should not dehydrate nested values until explic
           "bar": {}
         }
       },
-      "subHooks": []
+      "subHooks": [],
+      "hookSource": {
+        "lineNumber": 1111,
+        "functionName": "Example",
+        "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js",
+        "columnNumber": 15
+      }
     }
   ],
   "props": {
@@ -389,7 +443,13 @@ exports[`InspectedElementContext should not dehydrate nested values until explic
           }
         }
       },
-      "subHooks": []
+      "subHooks": [],
+      "hookSource": {
+        "lineNumber": 1111,
+        "functionName": "Example",
+        "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js",
+        "columnNumber": 15
+      }
     }
   ],
   "props": {
@@ -422,7 +482,12 @@ exports[`InspectedElementContext should not re-render a function with hooks if i
       "isStateEditable": true,
       "name": "State",
       "value": 0,
-      "subHooks": []
+      "subHooks": [],
+      "hookSource": {
+        "lineNumber": 307,
+        "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js",
+        "columnNumber": 15
+      }
     }
   ],
   "props": {
@@ -444,7 +509,12 @@ exports[`InspectedElementContext should not re-render a function with hooks if i
       "isStateEditable": true,
       "name": "State",
       "value": 0,
-      "subHooks": []
+      "subHooks": [],
+      "hookSource": {
+        "lineNumber": 307,
+        "fileName": "react-devtools-shared/src/__tests__/inspectedElementContext-test.js",
+        "columnNumber": 15
+      }
     }
   ],
   "props": {
