@@ -1308,7 +1308,7 @@ function getHookNodeWithInjectedVariableName(originalHook: HooksNode, nodesAssoc
       // const stateVariable = someState[0]
       // const setStateVariable = someState[1]
       //
-      // const [number2, setNumber2] = state
+      // const [number2, setNumber2] = someState
       //
       // We assign the state variable for 'someState' to multiple variables,
       // and hence cannot isolate a unique variable name. In such cases,
@@ -1344,7 +1344,7 @@ function injectSubHooksWithVariableNames(hook: HooksTree, sourceMaps: Downloaded
  * @param {NodePath} hook The AST Node Path for the concerned hook
  * @return {boolean}
  */
-function filterMemberWithHookVariableName(hook: NodePath): boolean {
+export function filterMemberWithHookVariableName(hook: NodePath): boolean {
     return hook.node.init.property.type === AST_NODE_TYPES.NUMERIC_LITERAL &&
         hook.node.init.property.value === 0;
 }
