@@ -1159,7 +1159,7 @@ function isPotentialHookDeclaration(path: NodePath): boolean {
  * @param {HooksNode} hook - Original hook object
  * @return {boolean} - Returns true for primitive hooks that are not assigned to variables.
  */
-function isNonDeclarativePrimitiveHook(hook: HooksNode) {
+export function isNonDeclarativePrimitiveHook(hook: HooksNode) {
   return ['Effect', 'ImperativeHandle', 'LayoutEffect', 'DebugValue'].includes(hook.name);
 }
 
@@ -1257,7 +1257,7 @@ function filterMemberNodesOfTargetHook(targetHookNode: NodePath, hookNode: NodeP
  * @param {NodePath} potentialReactHookASTNode
  * @return {HooksNode} new hook with variable name injected
  */
-function getHookNodeWithInjectedVariableName(originalHook: HooksNode, nodesAssociatedWithReactHookASTNode: NodePath[], potentialReactHookASTNode: NodePath): HooksNode {
+export function getHookNodeWithInjectedVariableName(originalHook: HooksNode, nodesAssociatedWithReactHookASTNode: NodePath[], potentialReactHookASTNode: NodePath): HooksNode {
   let hookVariableName: string | null;
   const isCustomHook = originalHook.id === null;
 

@@ -10,6 +10,8 @@ import {
   isConfirmedHookDeclaration,
   getFilteredHookASTNodes,
   filterMemberWithHookVariableName,
+  getHookNodeWithInjectedVariableName,
+  isNonDeclarativePrimitiveHook,
 } from 'react-devtools-shared/src/utils';
 
 describe('injectHookVariableNamesFunction', () => {
@@ -551,6 +553,338 @@ describe('injectHookVariableNamesFunction', () => {
     const hookName = getHookVariableName(nodesAssociatedWithReactHookASTNode[0], isCustomHook);
     expect(hookName).toBeFalsy();
 
+    done();
+  });
+
+  it('should create hookLog injected with variable names for destructured assignment', async done => {
+    const componentSnippet = `
+            const Example = () => {
+                const [count, setCount] = React.useState(1);
+                const [flag, setFlag] = useState(() => false);
+                const ref = useRef();
+                return [count, ref];
+            };
+        `;
+    const snippetHookLog = [
+      {
+        id: 0,
+        isStateEditable: true,
+        name: 'State',
+        value: 0,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 3,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 49
+        }
+      },
+      {
+        id: 1,
+        isStateEditable: true,
+        name: 'State',
+        value: false,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 4,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 41
+        }
+      },
+      {
+        id: 2,
+        isStateEditable: false,
+        name: 'Ref',
+        value: undefined,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 5,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 29
+        }
+      }
+    ];
+
+    const ast = parse(componentSnippet, {
+      sourceType: 'unambiguous',
+      plugins: ['jsx', 'typescript'],
+    });
+
+    const hookAstNodes = getPotentialHookDeclarationsFromAST(ast);
+    let lineNumber = 3;
+
+    const modifiedSnippetHookLog = snippetHookLog.map((hook) => {
+      const potentialReactHookASTNode = hookAstNodes
+          .find(node => checkNodeLocation(node, lineNumber) && isConfirmedHookDeclaration(node));
+      lineNumber++;
+      const nodesAssociatedWithReactHookASTNode = getFilteredHookASTNodes(
+        potentialReactHookASTNode,
+        hookAstNodes,
+        'example-app',
+        new Map()
+      );
+      const newHook = getHookNodeWithInjectedVariableName(hook, nodesAssociatedWithReactHookASTNode, potentialReactHookASTNode);
+      return newHook;
+    })
+    expect(modifiedSnippetHookLog).toMatchSnapshot('modified hook log');
+    done();
+  });
+
+  it('should create hookLog injected with variable names for inline/multi-line member expressions', async done => {
+    const componentSnippet = `
+            const Example = () => {
+                const countState = React.useState(1);
+                const [count, setCount] = countState;
+                const flagState = useState(() => false);
+                const flag = flagState[0];
+                const setFlag = flagState[1];
+                const tickState = React.useState(0);
+                const tick = tickState[0], setTick = tickState[1];
+                return [count, flag, tick];
+            };
+        `;
+    const snippetHookLog = [
+      {
+        id: 0,
+        isStateEditable: true,
+        name: 'State',
+        value: 1,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 3,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 42
+        }
+      },
+      {
+        id: 1,
+        isStateEditable: true,
+        name: 'State',
+        value: false,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 5,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 35
+        }
+      },
+      {
+        id: 2,
+        isStateEditable: true,
+        name: 'State',
+        value: 0,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 8,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 41
+        }
+      }
+    ];
+
+    const ast = parse(componentSnippet, {
+      sourceType: 'unambiguous',
+      plugins: ['jsx', 'typescript'],
+    });
+
+    const hookAstNodes = getPotentialHookDeclarationsFromAST(ast);
+    const lineNumbers = [3, 5, 8];
+    const potentialHooksMap = new Map();
+    let line = 0;
+
+    potentialHooksMap.set('example-app', hookAstNodes);
+    const modifiedSnippetHookLog = snippetHookLog.map((hook) => {
+      const potentialReactHookASTNode = hookAstNodes
+          .find(node => checkNodeLocation(node, lineNumbers[line]) && isConfirmedHookDeclaration(node));
+      line++;
+      if (!potentialReactHookASTNode) return hook;
+      const nodesAssociatedWithReactHookASTNode = getFilteredHookASTNodes(
+        potentialReactHookASTNode,
+        hookAstNodes,
+        'example-app',
+        potentialHooksMap
+      );
+      const newHook = getHookNodeWithInjectedVariableName(hook, nodesAssociatedWithReactHookASTNode, potentialReactHookASTNode);
+      return newHook
+    })
+    expect(modifiedSnippetHookLog).toMatchSnapshot('modified hook log');
+    done();
+  });
+
+  it('should create hookLog injected with default variable names for no/multiple references', async done => {
+    const componentSnippet = `
+            const Example = () => {
+                const countState = React.useState(1);
+                const [count, setCount] = countState;
+                const flagState = useState(() => false);
+                const tick = countState[0];
+                const setTick = countState[1];
+                return [count, flag, tick];
+            };
+        `;
+    const snippetHookLog = [
+      {
+        id: 0,
+        isStateEditable: true,
+        name: 'State',
+        value: 1,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 3,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 42
+        }
+      },
+      {
+        id: 1,
+        isStateEditable: true,
+        name: 'State',
+        value: false,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 5,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 35
+        }
+      }
+    ];
+
+    const ast = parse(componentSnippet, {
+      sourceType: 'unambiguous',
+      plugins: ['jsx', 'typescript'],
+    });
+
+    const hookAstNodes = getPotentialHookDeclarationsFromAST(ast);
+    const lineNumbers = [3, 5];
+    const potentialHooksMap = new Map();
+    let line = 0;
+
+    potentialHooksMap.set('example-app', hookAstNodes);
+    const modifiedSnippetHookLog = snippetHookLog.map((hook) => {
+      const potentialReactHookASTNode = hookAstNodes
+          .find(node => checkNodeLocation(node, lineNumbers[line]) && isConfirmedHookDeclaration(node));
+      line++;
+      if (!potentialReactHookASTNode) return hook;
+      const nodesAssociatedWithReactHookASTNode = getFilteredHookASTNodes(
+        potentialReactHookASTNode,
+        hookAstNodes,
+        'example-app',
+        potentialHooksMap
+      );
+      const newHook = getHookNodeWithInjectedVariableName(hook, nodesAssociatedWithReactHookASTNode, potentialReactHookASTNode);
+      return newHook;
+    })
+    expect(modifiedSnippetHookLog).toMatchSnapshot('modified hook log');
+    done();
+  });
+
+  it('should not inject hookLog with variable names for non declarative primitive hooks', async done => {
+    const componentSnippet = `
+            const Example = (props, ref) => {
+                const [flag, toggleFlag] = useState(false);
+                const inputRef = React.useRef();
+                useDebugValue(flag ? 'Set' : 'Reset');
+                useEffect(() => {
+                  toggleFlag(true);
+                }, []);
+                useLayoutEffect(() => {
+                  console.log(flag)
+                }, []);
+                return <input ref={inputRef} />;
+            };
+        `;
+
+    function effect() {}
+    const snippetHookLog = [
+      {
+        id: 0,
+        isStateEditable: true,
+        name: 'State',
+        value: false,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 3,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 44
+        }
+      },
+      {
+        id: 1,
+        isStateEditable: false,
+        name: 'Ref',
+        value: undefined,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 4,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 40
+        }
+      },
+      {
+        id: 2,
+        isStateEditable: false,
+        name: 'Effect',
+        value: effect,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 6,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 17
+        }
+      },
+      {
+        id: 3,
+        isStateEditable: false,
+        name: 'LayoutEffect',
+        value: effect,
+        subHooks: [],
+        hookSource: {
+          lineNumber: 9,
+          functionName: 'Example',
+          fileName: 'example-app.js',
+          columnNumber: 17
+        }
+      }
+    ];
+
+    const ast = parse(componentSnippet, {
+      sourceType: 'unambiguous',
+      plugins: ['jsx', 'typescript'],
+    });
+    const hookAstNodes = getPotentialHookDeclarationsFromAST(ast);
+    const lineNumbers = [3, 4, 6, 9];
+    const potentialHooksMap = new Map();
+    let line = 0;
+
+    potentialHooksMap.set('example-app', hookAstNodes);
+    const modifiedSnippetHookLog = snippetHookLog.map((hook) => {
+      const potentialReactHookASTNode = hookAstNodes
+          .find(node => checkNodeLocation(node, lineNumbers[line]) && isConfirmedHookDeclaration(node));
+      line++;
+      if (!potentialReactHookASTNode) {
+        expect(isNonDeclarativePrimitiveHook(hook)).toBe(true);
+        return hook;
+      };
+      const nodesAssociatedWithReactHookASTNode = getFilteredHookASTNodes(
+        potentialReactHookASTNode,
+        hookAstNodes,
+        'example-app',
+        potentialHooksMap
+      );
+      const newHook = getHookNodeWithInjectedVariableName(hook, nodesAssociatedWithReactHookASTNode, potentialReactHookASTNode);
+      return newHook;
+    })
+    expect(modifiedSnippetHookLog).toMatchSnapshot('modified hook log');
     done();
   });
 });
