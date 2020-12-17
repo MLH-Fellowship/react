@@ -12,9 +12,297 @@ import {
   filterMemberWithHookVariableName,
   getHookNodeWithInjectedVariableName,
   isNonDeclarativePrimitiveHook,
+  injectHookVariableNamesFunction,
 } from 'react-devtools-shared/src/utils';
 
+
 describe('injectHookVariableNamesFunction', () => {
+
+  it('should test injectHookVariableNamesFunction', async done => {
+    const fetch = global.fetch
+    const hookLog = [
+      {
+         'id':0,
+         'isStateEditable':true,
+         'name':'State',
+         'value':false,
+         'subHooks':[
+            
+         ],
+         'hookSource':{
+            'lineNumber':151,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js',
+            'columnNumber':89
+         }
+      },
+      {
+         'id':1,
+         'isStateEditable':true,
+         'name':'State',
+         'value':0,
+         'subHooks':[
+            
+         ],
+         'hookSource':{
+            'lineNumber':152,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js',
+            'columnNumber':62
+         }
+      },
+      {
+         'id':2,
+         'isStateEditable':true,
+         'name':'State',
+         'value':2,
+         'subHooks':[
+            
+         ],
+         'hookSource':{
+            'lineNumber':160,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js',
+            'columnNumber':63
+         }
+      },
+      {
+         'id':null,
+         'isStateEditable':false,
+         'name':'CustomHook',
+         'subHooks':[
+            {
+               'id':3,
+               'isStateEditable':false,
+               'name':'Ref',
+               'value':null,
+               'subHooks':[
+                  
+               ],
+               'hookSource':{
+                  'lineNumber':115,
+                  'functionName':'useCustomHook',
+                  'fileName':'/resources/bundle.js',
+                  'columnNumber':65
+               }
+            },
+            {
+               'id':4,
+               'isStateEditable':false,
+               'name':'Ref',
+               'subHooks':[
+                  
+               ],
+               'hookSource':{
+                  'lineNumber':116,
+                  'functionName':'useCustomHook',
+                  'fileName':'/resources/bundle.js',
+                  'columnNumber':65
+               }
+            }
+         ],
+         'hookSource':{
+            'lineNumber':163,
+            'columnNumber':23,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js'
+         }
+      },
+      {
+         'id':null,
+         'isStateEditable':false,
+         'name':'CustomHook',
+         'subHooks':[
+            {
+               'id':5,
+               'isStateEditable':false,
+               'name':'Ref',
+               'value':null,
+               'subHooks':[
+                  
+               ],
+               'hookSource':{
+                  'lineNumber':115,
+                  'functionName':'useCustomHook',
+                  'fileName':'/resources/bundle.js',
+                  'columnNumber':65
+               }
+            },
+            {
+               'id':6,
+               'isStateEditable':false,
+               'name':'Ref',
+               'subHooks':[
+                  
+               ],
+               'hookSource':{
+                  'lineNumber':116,
+                  'functionName':'useCustomHook',
+                  'fileName':'/resources/bundle.js',
+                  'columnNumber':65
+               }
+            }
+         ],
+         'hookSource':{
+            'lineNumber':164,
+            'columnNumber':35,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js'
+         }
+      },
+      {
+         'id':null,
+         'isStateEditable':false,
+         'name':'CustomHook',
+         'subHooks':[
+            {
+               'id':7,
+               'isStateEditable':false,
+               'name':'Ref',
+               'value':null,
+               'subHooks':[
+                  
+               ],
+               'hookSource':{
+                  'lineNumber':115,
+                  'functionName':'useCustomHook',
+                  'fileName':'/resources/bundle.js',
+                  'columnNumber':65
+               }
+            },
+            {
+               'id':8,
+               'isStateEditable':false,
+               'name':'Ref',
+               'subHooks':[
+                  
+               ],
+               'hookSource':{
+                  'lineNumber':116,
+                  'functionName':'useCustomHook',
+                  'fileName':'/resources/bundle.js',
+                  'columnNumber':65
+               }
+            }
+         ],
+         'hookSource':{
+            'lineNumber':168,
+            'columnNumber':3,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js'
+         }
+      },
+      {
+         'id':9,
+         'isStateEditable':false,
+         'name':'Ref',
+         'subHooks':[
+            
+         ],
+         'hookSource':{
+            'lineNumber':169,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js',
+            'columnNumber':64
+         }
+      },
+      {
+         'id':10,
+         'isStateEditable':true,
+         'name':'State',
+         'value':0,
+         'subHooks':[
+            
+         ],
+         'hookSource':{
+            'lineNumber':170,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js',
+            'columnNumber':72
+         }
+      },
+      {
+         'id':11,
+         'isStateEditable':true,
+         'name':'State',
+         'value':1,
+         'subHooks':[
+            
+         ],
+         'hookSource':{
+            'lineNumber':171,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js',
+            'columnNumber':89
+         }
+      },
+      {
+         'id':12,
+         'isStateEditable':true,
+         'name':'State',
+         'value':1,
+         'subHooks':[
+            
+         ],
+         'hookSource':{
+            'lineNumber':172,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js',
+            'columnNumber':82
+         }
+      },
+      {
+         'id':13,
+         'isStateEditable':true,
+         'name':'State',
+         'value':true,
+         'subHooks':[
+            
+         ],
+         'hookSource':{
+            'lineNumber':173,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js',
+            'columnNumber':66
+         }
+      },
+      {
+         'id':14,
+         'isStateEditable':true,
+         'name':'State',
+         'value':0,
+         'subHooks':[
+            
+         ],
+         'hookSource':{
+            'lineNumber':174,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js',
+            'columnNumber':85
+         }
+      },
+      {
+         'id':15,
+         'isStateEditable':false,
+         'name':'Effect',
+         'value':{
+            
+         },
+         'subHooks':[
+            
+         ],
+         'hookSource':{
+            'lineNumber':175,
+            'functionName':'Button',
+            'fileName':'/resources/bundle.js',
+            'columnNumber':58
+         }
+      }
+   ]
+    const newHookLog = await injectHookVariableNamesFunction(hookLog);
+    expect(newHookLog).toHaveLength(hookLog.length);
+    done();
+  })
 
   it('should identify variable names in destructed syntax', async done => {
     const componentSnippet = `

@@ -845,7 +845,7 @@ function getUniqueFileNames(hookLog: HooksTree): string[] {
  * @param {string} url
  * @returns Promisfied URL and its contents
  */
-function fetchFile(url: string): Promise<DownloadedFile> {
+export function fetchFile(url: string): Promise<DownloadedFile> {
   return new Promise((resolve, reject) => {
     fetch(url).then((res) => {
       if (res.ok) {
@@ -1435,7 +1435,6 @@ export function mergeVariableNamesIntoHookLog(oldHookLog: HooksTree, newHookLog:
 };
 
 export function injectHookVariableNamesFunction(hookLog: HooksTree): Promise<HooksTree> {
-  console.log('injectHookVariableNamesFunction called with', hookLog);
   const uniqueFilenames = getUniqueFileNames(hookLog);
   
   // To create a one-to-one mapping b/w source map URLs and source file URLs.
